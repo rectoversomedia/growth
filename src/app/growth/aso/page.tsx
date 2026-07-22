@@ -2,78 +2,52 @@
 
 import * as React from 'react';
 import {
-  ShieldCheck, Star, TrendUp, TrendDown, Warning, CheckCircle,
-  XCircle, Lightning, ArrowsClockwise, Target, ChartBar,
-  ThumbsUp, ThumbsDown, Megaphone, Info, ArrowRight, Sparkle,
-  Brain, ListChecks, Clock
+  ShieldCheck, Star, TrendUp, TrendDown, CheckCircle, Warning,
+  ArrowsClockwise, Target, Megaphone, Info, ArrowRight, Sparkle,
+  Brain, ListChecks, Clock, Lightning, ChartBar, ThumbsUp
 } from '@phosphor-icons/react';
 import { Card, CardContent, Badge, Button, Skeleton } from '@/components/ui';
 import { cn, getRelativeTime } from '@/lib/utils';
 
-function ScoreRing({ score, grade, label }: { score: number; grade: string; label: string }) {
-  const circumference = 2 * Math.PI * 44;
+function ScoreRing({ score, grade }: { score: number; grade: string }) {
+  const circumference = 2 * Math.PI * 48;
   const offset = circumference - (score / 100) * circumference;
   const color = score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : score >= 50 ? '#ef4444' : '#6b7280';
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-28 h-28">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="44" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-          <circle
-            cx="50" cy="50" r="44" fill="none"
-            stroke={color} strokeWidth="8"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            className="transition-all duration-700"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-slate-900">{score}</span>
-          <span className="text-xs font-bold text-slate-400">{grade}</span>
-        </div>
+    <div className="relative w-32 h-32">
+      <svg className="w-full h-full -rotate-90" viewBox="0 0 110 110">
+        <circle cx="55" cy="55" r="48" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+        <circle
+          cx="55" cy="55" r="48" fill="none"
+          stroke={color} strokeWidth="10"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="transition-all duration-700"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-3xl font-extrabold text-slate-900">{score}</span>
+        <span className="text-xs font-bold text-slate-400">{grade}</span>
       </div>
-      <p className="mt-2 text-sm font-medium text-slate-600">{label}</p>
     </div>
   );
 }
 
-function ComponentScoreBar({ label, score, weight }: { label: string; score: number; weight: number }) {
-  const color = score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-amber-500' : 'bg-red-500';
+function ComponentBar({ label, score, weight, color }: { label: string; score: number; weight: number; color: string }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium text-slate-600">{label}</span>
-        <span className="text-xs text-slate-400">{score}/100 <span className="text-slate-300">({weight}%)</span></span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-700">{score}<span className="text-slate-300 font-normal">/100</span></span>
+          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{weight}%</span>
+        </div>
       </div>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-        <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${score}%` }} />
+        <div className={cn('h-full rounded-full transition-all duration-700', color)} style={{ width: `${score}%` }} />
       </div>
-    </div>
-  );
-}
-
-function StarDistribution({ breakdown }: { breakdown: Record<string, string> }) {
-  const maxVal = Math.max(...Object.values(breakdown).map(v => parseInt(v)), 1);
-  return (
-    <div className="space-y-1.5">
-      {[5, 4, 3, 2, 1].map(star => {
-        const val = parseInt(breakdown[star.toString()] ?? '0');
-        const pct = Math.round((val / maxVal) * 100);
-        return (
-          <div key={star} className="flex items-center gap-2">
-            <span className="text-xs w-6 text-slate-500 text-right">{star}★</span>
-            <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={cn('h-full rounded-full', star >= 4 ? 'bg-emerald-500' : star === 3 ? 'bg-amber-500' : 'bg-red-400')}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="text-xs w-10 text-slate-400">{breakdown[star.toString()] ?? '0%'}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -86,19 +60,18 @@ export default function ASOHealthPage() {
   const [loadingAnalysis, setLoadingAnalysis] = React.useState(false);
 
   React.useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => d.authenticated && fetch('/api/growth/apps').then(r => r.json()).then(d => {
+    fetch('/api/growth/apps').then(r => r.json()).then(d => {
       setApps(d.data ?? []);
       if (d.data?.[0]?.id) setSelectedAppId(d.data[0].id);
       setLoadingApps(false);
-    }));
+    });
   }, []);
 
   React.useEffect(() => {
     if (!selectedAppId) return;
     setLoadingAnalysis(true);
     fetch(`/api/growth/analysis/aso?app_id=${selectedAppId}`)
-      .then(r => r.json())
-      .then(d => setAnalysis(d))
+      .then(r => r.json()).then(d => setAnalysis(d))
       .finally(() => setLoadingAnalysis(false));
   }, [selectedAppId]);
 
@@ -108,426 +81,415 @@ export default function ASOHealthPage() {
   const recs = analysis?.recommendations ?? [];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">ASO Health</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Unified app store optimization health score</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            className="h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white focus:border-brand-500 focus:outline-none"
-            value={selectedAppId}
-            onChange={e => setSelectedAppId(e.target.value)}
-            disabled={loadingApps}
-          >
-            <option value="">Select App…</option>
-            {apps.map(a => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
-          </select>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<ArrowsClockwise size={14} />}
-            onClick={() => selectedAppId && fetch(`/api/growth/analysis/aso?app_id=${selectedAppId}`).then(r => r.json()).then(setAnalysis)}
-            isLoading={loadingAnalysis}
-          >
-            Refresh
-          </Button>
+      <div className="bg-white border-b border-slate-200/80 px-6 py-5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-extrabold text-slate-900">ASO Health</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Unified app store optimization score</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-medium bg-white
+                focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-shadow"
+              value={selectedAppId}
+              onChange={e => setSelectedAppId(e.target.value)}
+              disabled={loadingApps}
+            >
+              <option value="">Select App…</option>
+              {apps.map(a => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 px-4 rounded-xl text-sm"
+              leftIcon={<ArrowsClockwise size={14} />}
+              onClick={() => selectedAppId && fetch(`/api/growth/analysis/aso?app_id=${selectedAppId}`).then(r => r.json()).then(setAnalysis)}
+              isLoading={loadingAnalysis}
+            >
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
 
-      {!selectedAppId && !loadingApps && (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <ShieldCheck size={48} className="text-brand-300 mb-4" />
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">Select an app to analyze</h2>
-          <p className="text-sm text-slate-500">Choose an app from the dropdown to see ASO health analysis.</p>
-        </div>
-      )}
+      <div className="max-w-7xl mx-auto px-6 py-6">
 
-      {selectedAppId && (
-        <>
-          {/* Score Overview */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
-            {/* Overall Score */}
-            <Card className="lg:col-span-1">
-              <CardContent className="p-5 flex flex-col items-center">
-                {loadingAnalysis ? (
-                  <Skeleton variant="rect" width={112} height={112} className="rounded-full" />
-                ) : score ? (
-                  <ScoreRing score={score.overall} grade={score.grade} label={score.label} />
-                ) : (
-                  <p className="text-sm text-slate-400">No data yet</p>
-                )}
-                {!loadingAnalysis && score && (
-                  <div className="mt-3 text-center">
-                    <Badge variant={score.trend === 'improving' ? 'default' : score.trend === 'declining' ? 'danger' : 'outline'}
-                      className={cn(
+        {!selectedAppId && !loadingApps && (
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-5">
+              <ShieldCheck size={32} className="text-brand-400" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Select an app to analyze</h2>
+            <p className="text-sm text-slate-500 max-w-sm">Choose an app above to see its ASO health analysis.</p>
+          </div>
+        )}
+
+        {selectedAppId && (
+          <>
+
+            {/* Score Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
+              {/* Score ring */}
+              <Card className="lg:col-span-1 border border-slate-200/80">
+                <CardContent className="p-6 flex flex-col items-center">
+                  {loadingAnalysis ? (
+                    <Skeleton variant="rect" width={128} height={128} className="rounded-full" />
+                  ) : score ? (
+                    <ScoreRing score={score.overall} grade={score.grade} />
+                  ) : (
+                    <p className="text-sm text-slate-400">No data</p>
+                  )}
+                  {!loadingAnalysis && score && (
+                    <div className="mt-3 text-center">
+                      <p className="text-sm font-medium text-slate-700">{score.label}</p>
+                      <Badge variant="outline" className={cn(
+                        'mt-2 rounded-lg text-xs font-medium',
                         score.trend === 'improving' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                         score.trend === 'declining' ? 'bg-red-50 text-red-700 border-red-200' :
                         'bg-slate-50 text-slate-600 border-slate-200'
+                      )}>
+                        {score.trend === 'improving' ? '↑ Improving' : score.trend === 'declining' ? '↓ Declining' : '→ Stable'}
+                      </Badge>
+                      <p className="text-[11px] text-slate-400 mt-1.5">{getRelativeTime(analysis.generated_at)}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Component scores */}
+              <Card className="lg:col-span-3 border border-slate-200/80">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-bold text-slate-900 mb-4">Score Breakdown</h3>
+                  {loadingAnalysis ? (
+                    <div className="space-y-4">{[...Array(5)].map((_, i) => <Skeleton key={i} height={10} />)}</div>
+                  ) : score ? (
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                      <ComponentBar label="Rating" score={score.components.rating} weight={25} color="bg-amber-500" />
+                      <ComponentBar label="Keywords" score={score.components.keyword} weight={25} color="bg-purple-500" />
+                      <ComponentBar label="Reviews" score={score.components.review} weight={20} color="bg-blue-500" />
+                      <ComponentBar label="Metadata" score={score.components.metadata} weight={20} color="bg-emerald-500" />
+                      <ComponentBar label="Freshness" score={score.components.freshness} weight={10} color="bg-slate-400" />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">Run a sync first.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Rating + Metadata */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+
+              {/* Rating Campaign */}
+              <Card className="border border-slate-200/80">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+                        <Star size={16} weight="fill" className="text-amber-500" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900">Rating Campaign</h3>
+                    </div>
+                    <a href="/growth/ratings" className="text-xs text-brand-600 font-medium hover:underline">Details →</a>
+                  </div>
+
+                  {loadingAnalysis ? (
+                    <Skeleton height={140} />
+                  ) : ratingData?.current ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <div className="text-3xl font-extrabold text-slate-900">{Number(ratingData.current.rating).toFixed(2)}</div>
+                          <div className="flex items-center gap-0.5 mt-1">
+                            {[1,2,3,4,5].map(i => (
+                              <Star key={i} size={14} weight={i <= Math.round(ratingData.current.rating) ? 'fill' : 'regular'} className="text-amber-400" />
+                            ))}
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">{Number(ratingData.current.total_ratings).toLocaleString()} ratings</p>
+                        </div>
+
+                        {/* Star breakdown mini bars */}
+                        <div className="flex-1 space-y-1.5">
+                          {[5,4,3,2,1].map(star => {
+                            const val = parseFloat(ratingData.current.percent_by_star?.[star.toString()] ?? '0');
+                            return (
+                              <div key={star} className="flex items-center gap-2">
+                                <span className="text-[11px] text-slate-500 w-4 text-right">{star}★</span>
+                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${Math.min(100, val * 3)}` }} />
+                                </div>
+                                <span className="text-[11px] text-slate-400 w-10">{val.toFixed(1)}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {ratingData.next_target && (
+                        <div className="p-3 rounded-xl bg-purple-50 border border-purple-200">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Target size={13} weight="fill" className="text-purple-600" />
+                            <span className="text-xs font-bold text-purple-800">Target: {ratingData.next_target.to}★</span>
+                          </div>
+                          <p className="text-xs text-purple-700">
+                            Need ~{ratingData.next_target.reviews_needed?.toLocaleString()} five-star reviews.
+                            At 30% conversion: ~{ratingData.next_target.days_at_incentivized_rate} days.
+                          </p>
+                        </div>
                       )}
-                    >
-                      {score.trend === 'improving' ? '↑ Improving' : score.trend === 'declining' ? '↓ Declining' : '→ Stable'}
-                    </Badge>
-                    <p className="text-xs text-slate-400 mt-1">{getRelativeTime(analysis.generated_at)}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Component Scores */}
-            <Card className="lg:col-span-3">
-              <CardContent className="p-5">
-                <h3 className="text-sm font-semibold text-slate-700 mb-4">Score Breakdown</h3>
-                {loadingAnalysis ? (
-                  <div className="space-y-4">{[...Array(5)].map((_, i) => <Skeleton key={i} variant="text" height={20} />)}</div>
-                ) : score ? (
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <ComponentScoreBar label="Rating" score={score.components.rating} weight={25} />
-                    <ComponentScoreBar label="Keywords" score={score.components.keyword} weight={25} />
-                    <ComponentScoreBar label="Reviews" score={score.components.review} weight={20} />
-                    <ComponentScoreBar label="Metadata" score={score.components.metadata} weight={20} />
-                    <ComponentScoreBar label="Freshness" score={score.components.freshness} weight={10} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400">Run a sync first to generate score.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                      {ratingData.trend && (
+                        <div className="flex items-center gap-4 text-xs">
+                          <div className={cn('flex items-center gap-1 font-semibold',
+                            ratingData.trend.daily_new_ratings >= 0 ? 'text-emerald-600' : 'text-red-500'
+                          )}>
+                            {ratingData.trend.daily_new_ratings >= 0 ? <TrendUp size={12} /> : <TrendDown size={12} />}
+                            ~{Math.abs(ratingData.trend.daily_new_ratings).toFixed(1)}/day
+                          </div>
+                          <div className={cn('flex items-center gap-1 font-semibold',
+                            (ratingData.trend.organic_5star_rate ?? 0) >= 0.2 ? 'text-emerald-600' : 'text-amber-600'
+                          )}>
+                            <ThumbsUp size={12} />
+                            {Math.round((ratingData.trend.organic_5star_rate ?? 0) * 100)}% organic 5★
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">Run a Light Sync to get rating data.</p>
+                  )}
+                </CardContent>
+              </Card>
 
-          {/* Rating Campaign + Metadata */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {/* Rating Campaign */}
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Star size={16} className="text-amber-500" />
-                    <h3 className="text-sm font-semibold text-slate-700">Rating Campaign</h3>
+              {/* Metadata */}
+              <Card className="border border-slate-200/80">
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                        <CheckCircle size={16} weight="duotone" className="text-blue-500" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900">Store Listing</h3>
+                    </div>
+                    <a href="/growth/recommendations" className="text-xs text-brand-600 font-medium hover:underline">Details →</a>
                   </div>
-                  <a href="/growth/ratings" className="text-xs text-brand-600 hover:underline font-medium">View details →</a>
-                </div>
 
-                {loadingAnalysis ? (
-                  <Skeleton variant="rect" height={160} />
-                ) : ratingData?.current ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="text-center">
-                        <div className="text-3xl font-bold text-slate-900">{Number(ratingData.current.rating).toFixed(2)}</div>
-                        <div className="flex items-center gap-0.5 mt-1">
-                          {[1,2,3,4,5].map(i => (
-                            <Star key={i} size={14} weight={i <= Math.round(ratingData.current.rating) ? 'fill' : 'regular'} className="text-amber-400" />
+                  {loadingAnalysis ? (
+                    <Skeleton height={140} />
+                  ) : metaData ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <div className={cn(
+                          'w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-extrabold',
+                          metaData.overall_score >= 85 ? 'bg-emerald-50 text-emerald-700' :
+                          metaData.overall_score >= 70 ? 'bg-amber-50 text-amber-700' :
+                          'bg-red-50 text-red-700'
+                        )}>
+                          {metaData.overall_score}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{metaData.grade_label}</div>
+                          <p className="text-xs text-slate-400">Grade <strong>{metaData.grade}</strong></p>
+                        </div>
+                      </div>
+
+                      {metaData.priority_fixes?.length > 0 && (
+                        <div className="space-y-2">
+                          {metaData.priority_fixes.slice(0, 3).map((fix: any) => (
+                            <div key={fix.position} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                              <div className={cn('w-5 h-5 rounded-lg text-xs font-bold flex items-center justify-center shrink-0',
+                                fix.impact === 'high' ? 'bg-red-100 text-red-700' :
+                                fix.impact === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                'bg-slate-100 text-slate-600'
+                              )}>
+                                {fix.position}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-700">{fix.field}</p>
+                                <p className="text-[11px] text-slate-400">{fix.action}</p>
+                              </div>
+                            </div>
                           ))}
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">{Number(ratingData.current.total_ratings).toLocaleString()} ratings</p>
-                      </div>
-                      <div className="flex-1 mx-6">
-                        <StarDistribution breakdown={ratingData.current.percent_by_star} />
-                      </div>
+                      )}
                     </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">Run a Full Sync to analyze metadata.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-                    {ratingData.next_target && (
-                      <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Target size={14} className="text-purple-600" />
-                          <span className="text-xs font-semibold text-purple-800">Next target: {ratingData.next_target.to}★</span>
-                        </div>
-                        <p className="text-xs text-purple-700">
-                          Need ~{ratingData.next_target.reviews_needed?.toLocaleString()} five-star reviews.
-                          {!ratingData.next_target.days_at_organic_rate ? '' :
-                            ` At organic rate: ${ratingData.next_target.days_at_organic_rate} days.`}
-                          At 30% conversion: ~{ratingData.next_target.days_at_incentivized_rate} days.
-                        </p>
-                      </div>
-                    )}
-
-                    {ratingData.trend && (
-                      <div className="flex items-center gap-3 text-xs">
-                        <div className={cn('flex items-center gap-1', ratingData.trend.daily_new_ratings >= 0 ? 'text-emerald-600' : 'text-red-600')}>
-                          {ratingData.trend.daily_new_ratings >= 0 ? <TrendUp size={12} /> : <TrendDown size={12} />}
-                          ~{Math.abs(ratingData.trend.daily_new_ratings).toLocaleString()}/day new ratings
-                        </div>
-                        <div className={cn('flex items-center gap-1', ratingData.trend.organic_5star_rate >= 0.2 ? 'text-emerald-600' : 'text-amber-600')}>
-                          {ratingData.trend.organic_5star_rate >= 0.2 ? <ThumbsUp size={12} /> : <ThumbsDown size={12} />}
-                          {Math.round(ratingData.trend.organic_5star_rate * 100)}% organic 5★
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400">Run a Light Sync to get rating data.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Metadata Score */}
-            <Card>
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={16} className="text-blue-500" />
-                    <h3 className="text-sm font-semibold text-slate-700">Store Listing Health</h3>
-                  </div>
-                  <a href="/growth/recommendations" className="text-xs text-brand-600 hover:underline font-medium">View details →</a>
-                </div>
-
-                {loadingAnalysis ? (
-                  <Skeleton variant="rect" height={160} />
-                ) : metaData ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        'w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold',
-                        metaData.overall_score >= 85 ? 'bg-emerald-50 text-emerald-700' :
-                        metaData.overall_score >= 70 ? 'bg-amber-50 text-amber-700' :
-                        'bg-red-50 text-red-700'
-                      )}>
-                        {metaData.overall_score}
+            {/* AI Deep Insights */}
+            {analysis?.ai_insights && (
+              <Card className="mb-5 border-2 border-purple-200/60 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-50 to-indigo-50 opacity-40" />
+                <CardContent className="p-5 relative">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center">
+                        <Sparkle size={16} className="text-purple-600" weight="fill" />
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-slate-900">{metaData.grade_label}</div>
-                        <p className="text-xs text-slate-400">Grade: <strong>{metaData.grade}</strong></p>
+                        <h3 className="text-sm font-bold text-slate-900">AI Deep Analysis</h3>
+                        <p className="text-[11px] text-slate-400">Powered by Claude</p>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="rounded-lg text-xs bg-purple-50 text-purple-600 border-purple-200">
+                        {analysis.ai_insights.model}
+                      </Badge>
+                      <span className="text-[11px] text-slate-400">
+                        {getRelativeTime(analysis.ai_insights.generatedAt)}
+                      </span>
+                    </div>
+                  </div>
 
-                    {metaData.priority_fixes?.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase">Priority fixes</p>
-                        {metaData.priority_fixes.map((fix: any) => (
-                          <div key={fix.position} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50">
-                            <div className={cn('w-5 h-5 rounded text-xs font-bold flex items-center justify-center shrink-0 mt-0.5',
-                              fix.impact === 'high' ? 'bg-red-100 text-red-700' :
-                              fix.impact === 'medium' ? 'bg-amber-100 text-amber-700' :
-                              'bg-slate-100 text-slate-600'
-                            )}>
-                              {fix.position}
+                  {analysis.ai_insights.executiveSummary && (
+                    <div className="mb-4 p-3.5 rounded-xl bg-white/80 border border-purple-100 shadow-sm">
+                      <p className="text-sm text-slate-800 font-medium leading-relaxed">
+                        {analysis.ai_insights.executiveSummary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Insight cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    {[
+                      { label: 'Rating Analysis', key: 'ratingAnalysis', color: 'amber', icon: Star },
+                      { label: 'Keyword Strategy', key: 'keywordStrategy', color: 'purple', icon: Lightning },
+                      { label: 'Review Campaign', key: 'reviewCampaignBrief', color: 'emerald', icon: ThumbsUp },
+                    ].map(({ label, key, color, icon: Icon }) => {
+                      const content = analysis.ai_insights[key];
+                      if (!content) return null;
+                      return (
+                        <div key={key} className="p-3.5 rounded-xl bg-white/80 border border-slate-100">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Icon size={13} className={cn(`text-${color}-500`)} weight="fill" />
+                            <span className="text-xs font-bold text-slate-700">{label}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                            {content.replace(/^##.*\n+/gm, '').slice(0, 180)}
+                            {content.length > 180 ? '…' : ''}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action Plan */}
+                  {analysis.ai_insights.actionPlan && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <ListChecks size={14} className="text-purple-600" />
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">AI Action Plan</span>
+                      </div>
+                      <div className="space-y-4">
+                        {[
+                          { label: 'This Week', icon: Clock, color: 'red', items: analysis.ai_insights.actionPlan.immediate },
+                          { label: 'Next 2–4 Weeks', icon: Brain, color: 'amber', items: analysis.ai_insights.actionPlan.shortTerm },
+                          { label: 'Next 1–3 Months', icon: Target, color: 'blue', items: analysis.ai_insights.actionPlan.longTerm },
+                        ].map(({ label, icon: Icon, color, items }) => items?.length > 0 && (
+                          <div key={label}>
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <Icon size={12} className={cn(`text-${color}-500`)} />
+                              <span className="text-xs font-semibold text-slate-500">{label}</span>
+                              <span className="text-[11px] text-slate-300">({items.length})</span>
                             </div>
-                            <div>
-                              <p className="text-xs font-medium text-slate-700">{fix.field}</p>
-                              <p className="text-xs text-slate-400">{fix.action}</p>
+                            <div className="space-y-2">
+                              {items.map((action: any, i: number) => (
+                                <div key={i} className={cn(
+                                  'flex items-start gap-3 p-3 rounded-xl border text-xs',
+                                  action.priority === 'critical' ? 'bg-red-50 border-red-200' :
+                                  action.priority === 'high' ? 'bg-amber-50 border-amber-200' :
+                                  'bg-white border-slate-100'
+                                )}>
+                                  <Badge variant="outline" className={cn('rounded-lg shrink-0 text-[10px] font-bold',
+                                    action.priority === 'critical' ? 'bg-red-100 text-red-700 border-red-200' :
+                                    action.priority === 'high' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                    'bg-slate-100 text-slate-600 border-slate-200'
+                                  )}>
+                                    {action.priority}
+                                  </Badge>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-slate-800">{action.title}</p>
+                                    <p className="text-slate-500 mt-0.5 leading-relaxed">{action.specificStep}</p>
+                                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-400">
+                                      {action.metricToTrack && <span>📈 {action.metricToTrack}</span>}
+                                      {action.deadline && <span>⏱ {action.deadline}</span>}
+                                      {action.estimatedImpact && <span>🎯 {action.estimatedImpact}</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-slate-400">Run a Full Sync to analyze metadata.</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-          {/* AI Deep Insights */}
-          {analysis?.ai_insights && (
-            <Card className="mb-6 border-2 border-purple-100">
+            {/* Recommendations */}
+            <Card className="border border-slate-200/80">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkle size={16} className="text-purple-500" />
-                    <h3 className="text-sm font-semibold text-slate-700">AI Deep Analysis</h3>
-                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
-                      {analysis.ai_insights.model}
-                    </Badge>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center">
+                      <Megaphone size={16} weight="fill" className="text-purple-500" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">Top Recommendations</h3>
                   </div>
-                  <span className="text-xs text-slate-400">
-                    Generated {getRelativeTime(analysis.ai_insights.generatedAt)}
-                  </span>
+                  <a href="/growth/recommendations" className="text-xs text-brand-600 font-medium hover:underline">All →</a>
                 </div>
 
-                {/* Executive Summary */}
-                {analysis.ai_insights.executiveSummary && (
-                  <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100">
-                    <p className="text-sm text-slate-700 font-medium leading-relaxed">
-                      {analysis.ai_insights.executiveSummary}
-                    </p>
+                {loadingAnalysis ? (
+                  <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} height={80} />)}</div>
+                ) : recs.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Info size={24} className="text-slate-200 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">No recommendations yet. Run a Full Sync.</p>
                   </div>
-                )}
-
-                {/* Quick insight tabs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Rating Analysis */}
-                  {analysis.ai_insights.ratingAnalysis && (
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Star size={13} className="text-amber-500" />
-                        <span className="text-xs font-semibold text-slate-600">Rating Analysis</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
-                        {analysis.ai_insights.ratingAnalysis.replace(/^##.*\n+/gm, '').slice(0, 200)}
-                        {analysis.ai_insights.ratingAnalysis.length > 200 ? '…' : ''}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Keyword Strategy */}
-                  {analysis.ai_insights.keywordStrategy && (
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Lightning size={13} className="text-blue-500" />
-                        <span className="text-xs font-semibold text-slate-600">Keyword Strategy</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
-                        {analysis.ai_insights.keywordStrategy.replace(/^##.*\n+/gm, '').slice(0, 200)}
-                        {analysis.ai_insights.keywordStrategy.length > 200 ? '…' : ''}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Review Campaign Brief */}
-                  {analysis.ai_insights.reviewCampaignBrief && (
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <ThumbsUp size={13} className="text-emerald-500" />
-                        <span className="text-xs font-semibold text-slate-600">Review Campaign</span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
-                        {analysis.ai_insights.reviewCampaignBrief.replace(/^##.*\n+/gm, '').slice(0, 200)}
-                        {analysis.ai_insights.reviewCampaignBrief.length > 200 ? '…' : ''}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* AI Action Plan */}
-                {analysis.ai_insights.actionPlan && (
-                  <div className="mt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <ListChecks size={14} className="text-purple-500" />
-                      <span className="text-xs font-semibold text-slate-600 uppercase">AI Action Plan</span>
-                    </div>
-                    <div className="space-y-3">
-                      {[
-                        { label: 'This Week', icon: Clock, items: analysis.ai_insights.actionPlan.immediate, color: 'red' },
-                        { label: 'Next 2–4 Weeks', icon: Brain, items: analysis.ai_insights.actionPlan.shortTerm, color: 'amber' },
-                        { label: 'Next 1–3 Months', icon: Target, items: analysis.ai_insights.actionPlan.longTerm, color: 'blue' },
-                      ].map(({ label, icon: Icon, items, color }) => items?.length > 0 && (
-                        <div key={label}>
-                          <div className="flex items-center gap-1.5 mb-2">
-                            <Icon size={12} className={`text-${color}-500`} />
-                            <span className="text-xs font-semibold text-slate-500">{label}</span>
-                            <span className="text-xs text-slate-300">({items.length})</span>
-                          </div>
-                          <div className="space-y-2">
-                            {items.map((action: any, i: number) => (
-                              <div key={i} className={cn(
-                                'flex items-start gap-3 p-3 rounded-lg border text-xs',
-                                action.priority === 'critical' ? 'bg-red-50 border-red-200' :
-                                action.priority === 'high' ? 'bg-amber-50 border-amber-200' :
-                                'bg-slate-50 border-slate-200'
-                              )}>
-                                <Badge variant="outline" className={cn(
-                                  'shrink-0 text-xs',
-                                  action.priority === 'critical' ? 'bg-red-100 text-red-700 border-red-200' :
-                                  action.priority === 'high' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                  'bg-slate-100 text-slate-600 border-slate-200'
-                                )}>
-                                  {action.priority}
-                                </Badge>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-slate-700">{action.title}</p>
-                                  <p className="text-slate-500 mt-0.5 leading-relaxed">{action.specificStep}</p>
-                                  <div className="flex items-center gap-3 mt-1.5 text-slate-400">
-                                    {action.metricToTrack && (
-                                      <span>📊 {action.metricToTrack}</span>
-                                    )}
-                                    {action.deadline && (
-                                      <span>⏱ {action.deadline}</span>
-                                    )}
-                                    {action.effort && (
-                                      <span className={cn(
-                                        action.effort === 'low' ? 'text-emerald-500' :
-                                        action.effort === 'high' ? 'text-red-500' : 'text-amber-500'
-                                      )}>
-                                        Effort: {action.effort}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                ) : (
+                  <div className="space-y-3">
+                    {recs.slice(0, 5).map((rec: any) => (
+                      <div key={rec.id} className={cn(
+                        'flex items-start gap-3.5 p-4 rounded-xl border transition-shadow hover:shadow-sm',
+                        rec.priority === 'critical' ? 'bg-red-50 border-red-200' :
+                        rec.priority === 'high' ? 'bg-amber-50 border-amber-200' :
+                        'bg-white border-slate-100'
+                      )}>
+                        <Badge variant="outline" className={cn('rounded-lg shrink-0 text-[10px] font-bold',
+                          rec.priority === 'critical' ? 'bg-red-100 text-red-700 border-red-200' :
+                          rec.priority === 'high' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          rec.priority === 'medium' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                          'bg-slate-100 text-slate-600 border-slate-200'
+                        )}>
+                          {rec.category}
+                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{rec.title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{rec.finding}</p>
+                          {rec.action && (
+                            <p className="text-xs text-brand-600 font-medium mt-1">→ {rec.action}</p>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                        <a href="/growth/recommendations">
+                          <ArrowRight size={14} className="text-slate-400 shrink-0 mt-1" />
+                        </a>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
             </Card>
-          )}
-
-          {/* Quick Recommendations */}
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Megaphone size={16} className="text-purple-500" />
-                  <h3 className="text-sm font-semibold text-slate-700">Top Recommendations</h3>
-                </div>
-                <a href="/growth/recommendations" className="text-xs text-brand-600 hover:underline font-medium">
-                  All recommendations →
-                </a>
-              </div>
-
-              {loadingAnalysis ? (
-                <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} variant="rect" height={60} />)}</div>
-              ) : recs.length === 0 ? (
-                <div className="text-center py-8">
-                  <Info size={24} className="mx-auto text-slate-300 mb-2" />
-                  <p className="text-sm text-slate-400">No recommendations yet. Run a Full Sync to analyze your app.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {recs.slice(0, 5).map((rec: any) => (
-                    <div key={rec.id} className={cn(
-                      'flex items-start gap-3 p-3 rounded-lg border',
-                      rec.priority === 'critical' ? 'bg-red-50 border-red-200' :
-                      rec.priority === 'high' ? 'bg-amber-50 border-amber-200' :
-                      'bg-slate-50 border-slate-200'
-                    )}>
-                      <div className={cn('shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold',
-                        rec.priority === 'critical' ? 'bg-red-200 text-red-800' :
-                        rec.priority === 'high' ? 'bg-amber-200 text-amber-800' :
-                        rec.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
-                        'bg-slate-200 text-slate-600'
-                      )}>
-                        {rec.category === 'rating' ? '★' :
-                         rec.category === 'keyword' ? '🔑' :
-                         rec.category === 'review' ? '📝' :
-                         rec.category === 'metadata' ? '📋' :
-                         rec.category === 'technical' ? '⚠️' : '•'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-slate-800">{rec.title}</p>
-                          <Badge variant="outline" className={cn(
-                            'text-xs',
-                            rec.priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
-                            rec.priority === 'high' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-slate-50 text-slate-600 border-slate-200'
-                          )}>
-                            {rec.priority}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-500 line-clamp-2">{rec.finding}</p>
-                        {rec.action && (
-                          <p className="text-xs text-brand-600 mt-1 font-medium">→ {rec.action}</p>
-                        )}
-                      </div>
-                      <a href="/growth/recommendations" className="shrink-0">
-                        <ArrowRight size={14} className="text-slate-400" />
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -76,6 +76,10 @@ export async function GET(request: NextRequest) {
       ? [...dailyCosts.values()].reduce((a, b) => a + b, 0) / dailyCosts.size
       : 0;
 
+    // Trial ends 2026-07-29
+    const trialEnd = new Date('2026-07-29T00:00:00Z');
+    const trialDaysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / 86400000));
+
     return NextResponse.json({
       internal_database: {
         status: dbStatus,
@@ -89,9 +93,9 @@ export async function GET(request: NextRequest) {
         last_successful_sync: apptweakLastSync,
         error: apptweakError,
         estimated_daily_average: Math.round(avgDaily * 100) / 100,
-        days_remaining: apptweakCredits && avgDaily > 0
-          ? Math.round(apptweakCredits / avgDaily)
-          : null,
+        trial_days_remaining: trialDaysRemaining,
+        plan: 'trial',
+        trial_total: 100000,
       },
       checked_at: new Date().toISOString(),
     });

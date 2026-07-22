@@ -11,15 +11,30 @@ export interface SyncScheduleConfig {
   competitorData: 'hourly' | 'daily' | 'weekly' | 'manual';
 }
 
+/**
+ * Credit-efficient default sync schedule:
+ *
+ * LIGHT (daily ~2 credits):
+ *   - currentRatings → 1 credit
+ *
+ * FULL  (weekly ~9 credits):
+ *   - metadata → 2 credits
+ *   - currentRatings → 1 credit
+ *   - reviews → 2 credits
+ *   - keywordRankings → 2 credits
+ *   - keywordMetrics → ~2 credits (top 10 keywords, 1 credit each)
+ *
+ * Heavy items (competitorData, keywordSuggestions) are manual-only by default.
+ */
 export const DEFAULT_SYNC_SCHEDULE: SyncScheduleConfig = {
-  metadata: 'daily',
+  metadata: 'weekly',
   currentRatings: 'daily',
-  ratingHistory: 'daily',
-  reviews: 'daily',
-  keywordRankings: 'daily',
+  ratingHistory: 'weekly',
+  reviews: 'weekly',
+  keywordRankings: 'weekly',
   keywordMetrics: 'weekly',
-  keywordSuggestions: 'weekly',
-  competitorData: 'daily',
+  keywordSuggestions: 'manual',
+  competitorData: 'manual',
 };
 
 export function getNextSyncTime(schedule: keyof SyncScheduleConfig, config: SyncScheduleConfig = DEFAULT_SYNC_SCHEDULE): Date | null {

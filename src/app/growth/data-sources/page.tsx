@@ -116,28 +116,59 @@ export default function DataSourcesPage() {
               {loading ? <Skeleton variant="rect" width={80} height={24} /> : <StatusIndicator status={at?.status ?? 'unknown'} />}
             </div>
           </div>
+
+          {/* Trial Plan Banner */}
+          {!loading && at?.status === 'connected' && (
+            <div className="mb-4 p-3 rounded-lg bg-purple-50 border border-purple-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ChartBar size={14} className="text-purple-600" />
+                <span className="text-xs font-semibold text-purple-800">
+                  Trial Plan: 100,000 credits
+                </span>
+              </div>
+              <a
+                href="https://dashboard.app.apptweak.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-purple-700 hover:text-purple-900 font-medium underline-offset-2 hover:underline"
+              >
+                View in Dashboard →
+              </a>
+            </div>
+          )}
+
           {loading ? (
             <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} variant="rect" height={40} />)}</div>
           ) : (
             <div className="space-y-3">
               {[
-                { label: 'Remaining Credits', value: at?.remaining_credits?.toLocaleString() ?? '—', highlight: (at?.remaining_credits ?? 0) < 1000 },
+                { label: 'Plan', value: 'Trial (100,000 credits)', sub: true },
+                { label: 'Credits Used (via app)', value: at?.estimated_daily_average != null ? `${Math.round((at as any).estimated_daily_average * 7)} total` : '—', sub: (at as any).estimated_daily_average == null },
                 { label: 'Last Successful Sync', value: at?.last_successful_sync ? getRelativeTime(at.last_successful_sync) : 'Never' },
                 { label: 'Est. Daily Consumption', value: at?.estimated_daily_average ? `~${at.estimated_daily_average} credits/day` : '—' },
-                { label: 'Days of Credits Left', value: at?.days_remaining ?? '—' },
+                { label: 'Days of Trial Left', value: (at as any).trial_days_remaining ?? '—' },
                 { label: 'Connection Error', value: at?.error ?? 'None' },
-              ].map(({ label, value, highlight }) => (
+              ].map(({ label, value }) => (
                 <div key={label} className="flex items-center justify-between p-3 rounded-lg bg-slate-50">
                   <span className="text-sm text-slate-500">{label}</span>
-                  <span className={cn('text-sm font-semibold', highlight ? 'text-amber-600' : 'text-slate-900')}>{value}</span>
+                  <span className="text-sm font-semibold text-slate-900">{value}</span>
                 </div>
               ))}
             </div>
           )}
           <div className="flex items-center gap-2 mt-4">
             <Button variant="outline" size="sm" onClick={checkCreditBalance} isLoading={checking}>
-              <ChartBar size={14} /> Check Credits
+              <ChartBar size={14} /> Check Connection
             </Button>
+            <a
+              href="https://dashboard.app.apptweak.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button variant="ghost" size="sm">
+                AppTweak Dashboard ↗
+              </Button>
+            </a>
             {at?.status === 'unconfigured' && (
               <Button variant="default" size="sm" onClick={() => window.location.href = '/growth/settings'}>
                 Configure API Key
@@ -147,35 +178,35 @@ export default function DataSourcesPage() {
         </CardContent>
       </Card>
 
-      {/* Credit Health Bar */}
-      {at?.remaining_credits != null && (
+      {/* Credit Usage Summary */}
+      {!loading && (at as any)?.estimated_daily_average > 0 && (
         <Card className="mb-4">
           <CardContent className="p-5">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">Credit Health</h3>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-4 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={cn('h-full rounded-full transition-all',
-                    (at.remaining_credits ?? 0) > 5000 ? 'bg-emerald-500' :
-                    (at.remaining_credits ?? 0) > 1000 ? 'bg-amber-500' : 'bg-red-500'
-                  )}
-                  style={{ width: `${Math.min(100, ((at.remaining_credits ?? 0) / 10000) * 100)}%` }}
-                />
-              </div>
-              <span className="text-sm font-semibold text-slate-700">{at.remaining_credits?.toLocaleString()}</span>
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Trial Credit Projection</h3>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              {[
+                { label: 'Per Day', value: `~${(at as any).estimated_daily_average} cr`, sub: 'average' },
+                { label: 'Per Week', value: `~${Math.round((at as any).estimated_daily_average * 7)} cr`, sub: 'average' },
+                { label: 'Trial Ends', value: '2026-07-29', sub: '7 days left' },
+              ].map(({ label, value, sub }) => (
+                <div key={label} className="p-3 rounded-lg bg-slate-50">
+                  <div className="text-sm font-bold text-slate-900">{value}</div>
+                  <div className="text-xs text-slate-400">{label}</div>
+                  <div className="text-xs text-slate-400">{sub}</div>
+                </div>
+              ))}
             </div>
-            {at.estimated_daily_average > 0 && (
-              <p className="text-xs text-slate-400 mt-2">
-                At ~{at.estimated_daily_average}/day, approximately {at.days_remaining ?? '?'} days of credits remaining.
-              </p>
-            )}
+            <div className="mt-3 p-2 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center gap-2">
+              <CheckCircle size={12} />
+              At ~{(at as any).estimated_daily_average}/day: estimated <strong>{(100000 / ((at as any).estimated_daily_average || 1)).toFixed(0)} days</strong> of monitoring possible with 100K trial
+            </div>
           </CardContent>
         </Card>
       )}
 
       <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-600 flex items-start gap-3">
         <Info size={16} className="text-slate-400 mt-0.5 shrink-0" />
-        <p>API credentials are stored server-side only and never exposed to the browser. AppTweak key is accessible only through server-side API routes.</p>
+        <p>API credentials are stored server-side only and never exposed to the browser. AppTweak key is accessible only through server-side API routes. Credit balance is visible in the <a href="https://dashboard.app.apptweak.com" target="_blank" rel="noopener noreferrer" className="font-medium text-purple-700 hover:underline">AppTweak dashboard</a>.</p>
       </div>
     </div>
   );

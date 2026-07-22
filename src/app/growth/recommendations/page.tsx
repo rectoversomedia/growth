@@ -3,7 +3,8 @@
 import * as React from 'react';
 import {
   Star, MagnifyingGlass, Megaphone, Warning, CheckCircle,
-  ArrowsClockwise, Bug, FileText, ThumbsUp, ThumbsDown, ChartBar, Target, Info
+  ArrowsClockwise, Bug, FileText, ThumbsUp, ThumbsDown, ChartBar, Target, Info,
+  Sparkle, ListChecks, Clock, Brain, ArrowRight
 } from '@phosphor-icons/react';
 import { Card, CardContent, Badge, Button, Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
@@ -99,6 +100,93 @@ export default function RecommendationsPage() {
           }} isLoading={loading}>Refresh</Button>
         </div>
       </div>
+
+      {/* AI Action Plan (from Claude) */}
+      {data?.ai_insights && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkle size={16} className="text-purple-500" />
+            <h2 className="text-base font-bold text-slate-900">AI Action Plan</h2>
+            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+              {data.ai_insights.model}
+            </Badge>
+          </div>
+
+          {/* Executive Summary */}
+          {data.ai_insights.executiveSummary && (
+            <Card className="mb-4 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+              <CardContent className="p-4">
+                <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                  {data.ai_insights.executiveSummary}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Three-column action plan */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                label: 'This Week',
+                icon: Clock,
+                color: 'red',
+                items: data.ai_insights.actionPlan?.immediate ?? [],
+                bg: 'bg-red-50 border-red-200',
+                badgeBg: 'bg-red-100 text-red-700',
+              },
+              {
+                label: 'Next 2–4 Weeks',
+                icon: Brain,
+                color: 'amber',
+                items: data.ai_insights.actionPlan?.shortTerm ?? [],
+                bg: 'bg-amber-50 border-amber-200',
+                badgeBg: 'bg-amber-100 text-amber-700',
+              },
+              {
+                label: 'Next 1–3 Months',
+                icon: Target,
+                color: 'blue',
+                items: data.ai_insights.actionPlan?.longTerm ?? [],
+                bg: 'bg-blue-50 border-blue-200',
+                badgeBg: 'bg-blue-100 text-blue-700',
+              },
+            ].map(({ label, icon: Icon, color, items, bg, badgeBg }) => items.length > 0 ? (
+              <div key={label} className={cn('rounded-xl border p-4', bg)}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon size={14} className={cn(`text-${color}-600`)} />
+                  <span className="text-xs font-bold text-slate-700">{label}</span>
+                  <span className={cn('ml-auto text-xs px-1.5 py-0.5 rounded font-bold', badgeBg)}>
+                    {items.length}
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {items.map((action: any, i: number) => (
+                    <div key={i} className="bg-white rounded-lg p-3 border border-white shadow-sm">
+                      <div className="flex items-start gap-2 mb-1.5">
+                        <span className={cn(
+                          'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold shrink-0',
+                          action.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                          action.priority === 'high' ? 'bg-amber-100 text-amber-700' :
+                          'bg-slate-100 text-slate-600'
+                        )}>
+                          {action.priority}
+                        </span>
+                        <p className="text-xs font-semibold text-slate-800 leading-snug">{action.title}</p>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed mb-2">{action.specificStep}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                        {action.metricToTrack && <span>📈 {action.metricToTrack}</span>}
+                        {action.deadline && <span>⏱ {action.deadline}</span>}
+                        {action.estimatedImpact && <span>🎯 {action.estimatedImpact}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null)}
+          </div>
+        </div>
+      )}
 
       {/* Priority Summary */}
       {allRecs.length > 0 && (

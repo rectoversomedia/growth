@@ -4,7 +4,8 @@ import * as React from 'react';
 import {
   ShieldCheck, Star, TrendUp, TrendDown, Warning, CheckCircle,
   XCircle, Lightning, ArrowsClockwise, Target, ChartBar,
-  ThumbsUp, ThumbsDown, Megaphone, Info, ArrowRight
+  ThumbsUp, ThumbsDown, Megaphone, Info, ArrowRight, Sparkle,
+  Brain, ListChecks, Clock
 } from '@phosphor-icons/react';
 import { Card, CardContent, Badge, Button, Skeleton } from '@/components/ui';
 import { cn, getRelativeTime } from '@/lib/utils';
@@ -319,6 +320,144 @@ export default function ASOHealthPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* AI Deep Insights */}
+          {analysis?.ai_insights && (
+            <Card className="mb-6 border-2 border-purple-100">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkle size={16} className="text-purple-500" />
+                    <h3 className="text-sm font-semibold text-slate-700">AI Deep Analysis</h3>
+                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+                      {analysis.ai_insights.model}
+                    </Badge>
+                  </div>
+                  <span className="text-xs text-slate-400">
+                    Generated {getRelativeTime(analysis.ai_insights.generatedAt)}
+                  </span>
+                </div>
+
+                {/* Executive Summary */}
+                {analysis.ai_insights.executiveSummary && (
+                  <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100">
+                    <p className="text-sm text-slate-700 font-medium leading-relaxed">
+                      {analysis.ai_insights.executiveSummary}
+                    </p>
+                  </div>
+                )}
+
+                {/* Quick insight tabs */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Rating Analysis */}
+                  {analysis.ai_insights.ratingAnalysis && (
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Star size={13} className="text-amber-500" />
+                        <span className="text-xs font-semibold text-slate-600">Rating Analysis</span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                        {analysis.ai_insights.ratingAnalysis.replace(/^##.*\n+/gm, '').slice(0, 200)}
+                        {analysis.ai_insights.ratingAnalysis.length > 200 ? '…' : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Keyword Strategy */}
+                  {analysis.ai_insights.keywordStrategy && (
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Lightning size={13} className="text-blue-500" />
+                        <span className="text-xs font-semibold text-slate-600">Keyword Strategy</span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                        {analysis.ai_insights.keywordStrategy.replace(/^##.*\n+/gm, '').slice(0, 200)}
+                        {analysis.ai_insights.keywordStrategy.length > 200 ? '…' : ''}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Review Campaign Brief */}
+                  {analysis.ai_insights.reviewCampaignBrief && (
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <ThumbsUp size={13} className="text-emerald-500" />
+                        <span className="text-xs font-semibold text-slate-600">Review Campaign</span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                        {analysis.ai_insights.reviewCampaignBrief.replace(/^##.*\n+/gm, '').slice(0, 200)}
+                        {analysis.ai_insights.reviewCampaignBrief.length > 200 ? '…' : ''}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Action Plan */}
+                {analysis.ai_insights.actionPlan && (
+                  <div className="mt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ListChecks size={14} className="text-purple-500" />
+                      <span className="text-xs font-semibold text-slate-600 uppercase">AI Action Plan</span>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { label: 'This Week', icon: Clock, items: analysis.ai_insights.actionPlan.immediate, color: 'red' },
+                        { label: 'Next 2–4 Weeks', icon: Brain, items: analysis.ai_insights.actionPlan.shortTerm, color: 'amber' },
+                        { label: 'Next 1–3 Months', icon: Target, items: analysis.ai_insights.actionPlan.longTerm, color: 'blue' },
+                      ].map(({ label, icon: Icon, items, color }) => items?.length > 0 && (
+                        <div key={label}>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <Icon size={12} className={`text-${color}-500`} />
+                            <span className="text-xs font-semibold text-slate-500">{label}</span>
+                            <span className="text-xs text-slate-300">({items.length})</span>
+                          </div>
+                          <div className="space-y-2">
+                            {items.map((action: any, i: number) => (
+                              <div key={i} className={cn(
+                                'flex items-start gap-3 p-3 rounded-lg border text-xs',
+                                action.priority === 'critical' ? 'bg-red-50 border-red-200' :
+                                action.priority === 'high' ? 'bg-amber-50 border-amber-200' :
+                                'bg-slate-50 border-slate-200'
+                              )}>
+                                <Badge variant="outline" className={cn(
+                                  'shrink-0 text-xs',
+                                  action.priority === 'critical' ? 'bg-red-100 text-red-700 border-red-200' :
+                                  action.priority === 'high' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                  'bg-slate-100 text-slate-600 border-slate-200'
+                                )}>
+                                  {action.priority}
+                                </Badge>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-slate-700">{action.title}</p>
+                                  <p className="text-slate-500 mt-0.5 leading-relaxed">{action.specificStep}</p>
+                                  <div className="flex items-center gap-3 mt-1.5 text-slate-400">
+                                    {action.metricToTrack && (
+                                      <span>📊 {action.metricToTrack}</span>
+                                    )}
+                                    {action.deadline && (
+                                      <span>⏱ {action.deadline}</span>
+                                    )}
+                                    {action.effort && (
+                                      <span className={cn(
+                                        action.effort === 'low' ? 'text-emerald-500' :
+                                        action.effort === 'high' ? 'text-red-500' : 'text-amber-500'
+                                      )}>
+                                        Effort: {action.effort}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Recommendations */}
           <Card>

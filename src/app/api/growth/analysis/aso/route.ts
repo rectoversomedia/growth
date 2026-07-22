@@ -16,6 +16,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { getSession } from '@/lib/auth';
 import { runASOAnalysis } from '@/lib/growth/analysis/recommendation-engine';
 import { createApptweakClient } from '@/lib/growth/apptweak/client';
+import { generateAIInsights, type AIAnalysisInput } from '@/lib/ai/insights';
 
 export async function GET(request: NextRequest) {
   try {
@@ -186,6 +187,73 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // ── AI-powered deep insights ──
+    const aiInput: AIAnalysisInput = {
+      appName: app.name,
+      appPlatform: app.device ?? 'android',
+      country,
+      currentRating: analysis.rating.current?.rating ?? 0,
+      totalRatings: analysis.rating.current?.total_ratings ?? 0,
+      ratingTrend: analysis.rating.trend?.rating_velocity ?? 0,
+      organic5StarRate: analysis.rating.trend?.organic_5star_rate ?? 0,
+      dailyNewRatings: analysis.rating.trend?.daily_new_ratings ?? 0,
+      dailyNew5Star: analysis.rating.trend?.daily_new_5star ?? 0,
+      starBreakdown: {
+        5: Number(analysis.rating.current?.stars?.['5'] ?? 0),
+        4: Number(analysis.rating.current?.stars?.['4'] ?? 0),
+        3: Number(analysis.rating.current?.stars?.['3'] ?? 0),
+        2: Number(analysis.rating.current?.stars?.['2'] ?? 0),
+        1: Number(analysis.rating.current?.stars?.['1'] ?? 0),
+      },
+      ratingTargets: analysis.rating.targets.map(t => ({
+        from: t.from,
+        to: t.to,
+        reviewsNeeded: t.reviews_needed,
+        daysAtIncentivized: t.days_at_incentivized_rate ?? 0,
+      })),
+      topKeywords: [...kwMap.values()].map(k => ({
+        keyword: k.keyword,
+        rank: k.rank,
+        volume: k.volume,
+        difficulty: k.difficulty,
+        change: k.previous_rank != null && k.rank != null ? k.rank - k.previous_rank : null,
+      })),
+      newOpportunities: analysis.keywords.new_opportunities.slice(0, 10).map(k => ({
+        keyword: k.keyword,
+        volume: k.volume,
+        difficulty: k.difficulty,
+        opportunityScore: k.opportunity_score,
+      })),
+      decliningKeywords: analysis.keywords.top_declines.slice(0, 5).map(k => ({
+        keyword: k.keyword,
+        rank: k.rank,
+        change: Math.abs(k.rank_change ?? 0),
+      })),
+      totalReviewsAnalyzed: analysis.reviews.summary.total_reviews_analyzed,
+      positiveKeywords: analysis.reviews.keyword_mentions
+        .filter(k => k.positive_rate >= 70)
+        .slice(0, 8)
+        .map(k => ({ keyword: k.keyword, mentions: k.total_mentions, positiveRate: k.positive_rate })),
+      negativeKeywords: analysis.reviews.keyword_mentions
+        .filter(k => k.positive_rate < 50)
+        .slice(0, 5)
+        .map(k => ({ keyword: k.keyword, mentions: k.total_mentions, positiveRate: k.positive_rate })),
+      technicalIssues: analysis.reviews.summary.technical_issues,
+      samplePositiveReviews: reviews.filter(r => r.rating >= 4).slice(0, 3).map(r => r.text),
+      sampleNegativeReviews: reviews.filter(r => r.rating <= 2).slice(0, 3).map(r => r.text),
+      metadataScore: analysis.metadata.overall_score,
+      metadataIssues: analysis.metadata.priority_fixes.map(f => f.field),
+      trialCreditsRemaining: 100000,
+      trialDaysLeft: 7,
+    };
+
+    let aiInsights: import('@/lib/ai/insights').AIInsights | null = null;
+    try {
+      aiInsights = await generateAIInsights(aiInput);
+    } catch (e) {
+      console.warn('[ASO API] AI insights generation failed:', e);
+    }
+
     // Strip heavy details unless requested
     const response = includeDetails
       ? analysis
@@ -218,6 +286,7 @@ export async function GET(request: NextRequest) {
             priority_fixes: analysis.metadata.priority_fixes.slice(0, 3),
           },
           score_breakdown: analysis.score_breakdown,
+          ai_insights: aiInsights,
           generated_at: analysis.generated_at,
         };
 

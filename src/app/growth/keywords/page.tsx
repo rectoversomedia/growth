@@ -1,189 +1,277 @@
 'use client';
 
 import * as React from 'react';
-import { MagnifyingGlass, TrendUp, TrendDown, ArrowsClockwise } from '@phosphor-icons/react';
-import { Card, CardContent, Badge, Skeleton, Button, DataTable, Select } from '@/components/ui';
-import { cn, formatNumber } from '@/lib/utils';
+import {
+  TrendUp, TrendDown, Warning, Target, ArrowsClockwise,
+  MagnifyingGlass, Plus, Minus, Star, ChartBar
+} from '@phosphor-icons/react';
+import { Card, CardContent, Badge, Button, Skeleton } from '@/components/ui';
+import { cn } from '@/lib/utils';
+
+function PriorityBadge({ priority }: { priority: string }) {
+  return (
+    <Badge variant="outline" className={cn(
+      'text-xs',
+      priority === 'critical' ? 'bg-red-50 text-red-700 border-red-200' :
+      priority === 'high' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+      priority === 'medium' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+      'bg-slate-50 text-slate-600 border-slate-200'
+    )}>
+      {priority}
+    </Badge>
+  );
+}
 
 export default function KeywordsPage() {
   const [apps, setApps] = React.useState<any[]>([]);
-  const [selectedAppId, setSelectedAppId] = React.useState('');
-  const [keywords, setKeywords] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [total, setTotal] = React.useState(0);
-  const [page, setPage] = React.useState(1);
-  const [groupFilter, setGroupFilter] = React.useState('');
-  const [labelFilter, setLabelFilter] = React.useState('');
+  const [selectedAppId, setSelectedAppId] = React.useState<string>('');
+  const [data, setData] = React.useState<any>(null);
+  const [loadingApps, setLoadingApps] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
+  const [tab, setTab] = React.useState<'opportunities' | 'gains' | 'declines' | 'all'>('opportunities');
 
   React.useEffect(() => {
-    fetch('/api/growth/apps').then(r => r.json()).then(d => {
-      setApps(d.data ?? []);
-      if (d.data?.[0]?.id) setSelectedAppId(d.data[0].id);
-    }).finally(() => setLoading(false));
+    fetch('/api/auth/me').then(r => r.json()).then(d =>
+      d.authenticated && fetch('/api/growth/apps').then(r => r.json()).then(d => {
+        setApps(d.data ?? []);
+        if (d.data?.[0]?.id) setSelectedAppId(d.data[0].id);
+        setLoadingApps(false);
+      })
+    );
   }, []);
 
   React.useEffect(() => {
     if (!selectedAppId) return;
     setLoading(true);
-    const params = new URLSearchParams({ app_id: selectedAppId, page: page.toString(), limit: '20' });
-    if (groupFilter) params.set('keyword_group', groupFilter);
-    if (labelFilter) params.set('strategic_label', labelFilter);
-    fetch(`/api/growth/keywords?${params}`)
+    fetch(`/api/growth/analysis/keywords?app_id=${selectedAppId}`)
       .then(r => r.json())
-      .then(d => { setKeywords(d.data ?? []); setTotal(d.total ?? 0); })
+      .then(d => setData(d))
       .finally(() => setLoading(false));
-  }, [selectedAppId, page, groupFilter, labelFilter]);
+  }, [selectedAppId]);
 
-  const columns = [
-    {
-      key: 'keyword',
-      header: 'Keyword',
-      render: (row: any) => (
-        <span className="font-medium text-slate-900">{row.keyword?.keyword ?? '—'}</span>
-      ),
-    },
-    {
-      key: 'rank',
-      header: 'Rank',
-      width: '80px',
-      align: 'center' as const,
-      render: (row: any) => {
-        const rank = row.latest_rank?.[0]?.rank;
-        if (rank == null) return <span className="text-slate-400">—</span>;
-        const prevRank = row.latest_rank?.[0]?.previous_rank;
-        const change = prevRank != null ? rank - prevRank : 0;
-        return (
-          <div className="flex items-center gap-2 justify-center">
-            <span className="font-semibold text-slate-900">{rank}</span>
-            {change !== 0 && (
-              <span className={cn('flex items-center gap-0.5 text-xs', change < 0 ? 'text-emerald-600' : 'text-red-500')}>
-                {change < 0 ? <TrendDown size={10} /> : <TrendUp size={10} />}
-                {Math.abs(change)}
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'volume',
-      header: 'Volume',
-      align: 'right' as const,
-      render: (row: any) => <span className="text-slate-600">{formatNumber(row.volume ?? 0)}</span>,
-    },
-    {
-      key: 'difficulty',
-      header: 'Difficulty',
-      align: 'center' as const,
-      render: (row: any) => {
-        const d = row.difficulty;
-        if (d == null) return <span className="text-slate-400">—</span>;
-        const color = d < 30 ? 'text-emerald-600' : d < 60 ? 'text-amber-600' : 'text-red-600';
-        return <span className={`font-medium ${color}`}>{d}</span>;
-      },
-    },
-    {
-      key: 'kei',
-      header: 'KEI',
-      align: 'right' as const,
-      render: (row: any) => <span className="text-slate-600">{row.kei != null ? row.kei.toFixed(1) : '—'}</span>,
-    },
-    {
-      key: 'group',
-      header: 'Group',
-      render: (row: any) => {
-        const g = row.keyword?.keyword_group;
-        if (!g) return <span className="text-slate-400">—</span>;
-        return <Badge variant="outline">{g.replace('_', ' ')}</Badge>;
-      },
-    },
-    {
-      key: 'label',
-      header: 'Strategic',
-      render: (row: any) => {
-        const labels: Record<string, string> = {
-          defend: 'info', quick_win: 'success', growth_opportunity: 'purple',
-          competitive: 'warning', declining: 'danger', lost: 'danger',
-          monitor: 'outline', exclude: 'outline',
-        };
-        const v = labels[row.strategic_label ?? ''] ?? 'outline';
-        return row.strategic_label
-          ? <Badge variant={v as any}>{row.strategic_label.replace('_', ' ')}</Badge>
-          : <span className="text-slate-400">—</span>;
-      },
-    },
-    {
-      key: 'priority',
-      header: 'Priority',
-      align: 'center' as const,
-      render: (row: any) => row.is_priority
-        ? <Badge variant="success" size="sm">Priority</Badge>
-        : null,
-    },
-  ];
+  const summary = data?.summary;
+  const topGains = data?.top_gains ?? [];
+  const topDeclines = data?.top_declines ?? [];
+  const newOpportunities = data?.new_opportunities ?? [];
+  const allOpportunities = data?.opportunities ?? [];
+  const recommendations = data?.recommendations ?? [];
+
+  const tabData = {
+    opportunities: newOpportunities,
+    gains: topGains,
+    declines: topDeclines,
+    all: allOpportunities,
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Keyword Intelligence</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Keyword rankings, volume, and strategic labels</p>
+          <h1 className="text-2xl font-bold text-slate-900">Keyword Opportunities</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Keyword gap analysis — find high-value search terms to rank for</p>
         </div>
         <div className="flex items-center gap-3">
-          <select className="h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white" value={selectedAppId} onChange={e => setSelectedAppId(e.target.value)}>
-            <option value="">Select App...</option>
-            {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          <select
+            className="h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white focus:border-brand-500 focus:outline-none"
+            value={selectedAppId}
+            onChange={e => setSelectedAppId(e.target.value)}
+            disabled={loadingApps}
+          >
+            <option value="">Select App…</option>
+            {apps.map(a => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
           </select>
-          <Button variant="outline" size="sm" leftIcon={<ArrowsClockwise size={14} />}>Sync Keywords</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowsClockwise size={14} />} onClick={() => {
+            if (!selectedAppId) return;
+            setLoading(true);
+            fetch(`/api/growth/analysis/keywords?app_id=${selectedAppId}`).then(r => r.json()).then(setData).finally(() => setLoading(false));
+          }} isLoading={loading}>Refresh</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: 'Total Keywords', value: total },
-          { label: 'Top 10 Keywords', value: keywords.filter((k: any) => (k.latest_rank?.[0]?.rank ?? 999) <= 10).length },
-          { label: 'Opportunities', value: keywords.filter((k: any) => k.strategic_label === 'growth_opportunity').length },
-          { label: 'At Risk', value: keywords.filter((k: any) => k.strategic_label === 'declining').length },
-        ].map(({ label, value }) => (
-          <Card key={label}>
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-slate-900">{loading ? '—' : value}</p>
-              <p className="text-xs text-slate-500 mt-1">{label}</p>
+      {!selectedAppId && !loadingApps && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <MagnifyingGlass size={48} className="text-brand-200 mb-4" />
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Select an app to analyze keywords</h2>
+          <p className="text-sm text-slate-500">Keyword gap analysis requires app data from a Full Sync.</p>
+        </div>
+      )}
+
+      {selectedAppId && (
+        <>
+          {/* Summary Cards */}
+          {summary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {[
+                { label: 'Tracked Keywords', value: summary.total_tracked, color: 'bg-blue-50 text-blue-500' },
+                { label: 'Avg Rank', value: summary.avg_rank != null ? `#${summary.avg_rank}` : '—', color: 'bg-emerald-50 text-emerald-500' },
+                { label: 'Improving', value: summary.improving_count, color: summary.improving_count > 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-50 text-slate-400' },
+                { label: 'Opportunities', value: summary.new_opportunities_count, color: summary.new_opportunities_count > 0 ? 'bg-purple-50 text-purple-500' : 'bg-slate-50 text-slate-400' },
+              ].map(({ label, value, color }) => (
+                <Card key={label}>
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', color)}>
+                      <MagnifyingGlass size={16} />
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-slate-900">{loading ? '—' : value}</div>
+                      <div className="text-xs text-slate-500">{label}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div className="flex gap-1 mb-4 border-b border-slate-200">
+            {([
+              ['opportunities', `New Opportunities (${newOpportunities.length})`],
+              ['gains', `Improving (${topGains.length})`],
+              ['declines', `Declining (${topDeclines.length})`],
+              ['all', `All (${allOpportunities.length})`],
+            ] as const).map(([key, label]) => (
+              <button key={key} onClick={() => setTab(key)}
+                className={cn('px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                  tab === key ? 'border-brand-600 text-brand-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Keyword Recommendations */}
+          {recommendations.filter((r: any) => r.keyword).length > 0 && tab === 'opportunities' && (
+            <Card className="mb-4">
+              <CardContent className="p-5">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <Target size={14} className="text-purple-500" /> Keyword Actions
+                </h3>
+                <div className="space-y-2">
+                  {recommendations.slice(0, 5).map((rec: any) => (
+                    <div key={rec.id} className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 border border-purple-100">
+                      <div className="shrink-0 w-5 h-5 rounded bg-purple-200 text-purple-700 text-xs font-bold flex items-center justify-center mt-0.5">
+                        {rec.priority === 'high' ? '!' : '+'}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-slate-800">{rec.title}</p>
+                          <PriorityBadge priority={rec.priority} />
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">{rec.finding}</p>
+                        <p className="text-xs text-purple-700 mt-1 font-medium">→ {rec.action}</p>
+                        <p className="text-xs text-slate-400 mt-1">{rec.expected_impact}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Table */}
+          <Card>
+            <CardContent className="p-0">
+              {loading ? (
+                <div className="p-5 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} variant="rect" height={48} />)}</div>
+              ) : tabData[tab].length === 0 ? (
+                <div className="p-12 text-center text-sm text-slate-400">
+                  <MagnifyingGlass size={24} className="mx-auto mb-2 opacity-50" />
+                  No keywords in this category. Run a Full Sync to discover keyword opportunities.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <th className="text-left px-4 py-3 font-medium text-slate-500">Keyword</th>
+                        <th className="text-center px-3 py-3 font-medium text-slate-500">Rank</th>
+                        <th className="text-center px-3 py-3 font-medium text-slate-500">Change</th>
+                        <th className="text-right px-3 py-3 font-medium text-slate-500">Volume</th>
+                        <th className="text-right px-3 py-3 font-medium text-slate-500">Difficulty</th>
+                        <th className="text-right px-3 py-3 font-medium text-slate-500">Score</th>
+                        <th className="text-left px-3 py-3 font-medium text-slate-500">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tabData[tab].map((kw: any) => (
+                        <tr key={kw.id} className="border-b border-slate-50 hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-800">{kw.keyword}</td>
+                          <td className="px-3 py-3 text-center font-mono">
+                            {kw.rank != null ? (
+                              <span className={cn('font-bold',
+                                kw.rank <= 10 ? 'text-emerald-600' :
+                                kw.rank <= 30 ? 'text-amber-600' : 'text-slate-600'
+                              )}>
+                                #{kw.rank}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-xs">Not ranked</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {kw.rank_change != null ? (
+                              <div className={cn('flex items-center justify-center gap-1 font-bold',
+                                kw.rank_change > 0 ? 'text-emerald-600' :
+                                kw.rank_change < 0 ? 'text-red-500' : 'text-slate-400'
+                              )}>
+                                {kw.rank_change > 0 ? <TrendUp size={12} /> : kw.rank_change < 0 ? <TrendDown size={12} /> : null}
+                                {kw.rank_change > 0 ? '+' : ''}{kw.rank_change}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right text-slate-600 font-mono">
+                            {kw.volume != null ? kw.volume.toLocaleString() : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {kw.difficulty != null ? (
+                              <div className="flex items-center justify-end gap-1.5">
+                                <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className={cn('h-full rounded-full',
+                                    kw.difficulty <= 30 ? 'bg-emerald-500' :
+                                    kw.difficulty <= 60 ? 'bg-amber-500' : 'bg-red-400'
+                                  )} style={{ width: `${kw.difficulty}%` }} />
+                                </div>
+                                <span className="text-xs text-slate-500 w-6">{kw.difficulty}</span>
+                              </div>
+                            ) : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <span className={cn('font-bold',
+                              kw.opportunity_score >= 60 ? 'text-emerald-600' :
+                              kw.opportunity_score >= 40 ? 'text-amber-600' : 'text-slate-500'
+                            )}>
+                              {kw.opportunity_score}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex flex-wrap gap-1">
+                              {(kw.tags ?? []).map((tag: string) => (
+                                <span key={tag} className={cn('text-xs px-1.5 py-0.5 rounded-full',
+                                  tag === 'high-value' ? 'bg-emerald-50 text-emerald-700' :
+                                  tag === 'improving' ? 'bg-emerald-50 text-emerald-700' :
+                                  tag === 'declining' ? 'bg-red-50 text-red-700' :
+                                  tag === 'at-risk' ? 'bg-amber-50 text-amber-700' :
+                                  tag === 'not-ranked' ? 'bg-purple-50 text-purple-700' :
+                                  'bg-slate-50 text-slate-600'
+                                )}>
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
-        ))}
-      </div>
-
-      <Card>
-        <CardContent className="p-0">
-          <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-            <select className="h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white" value={groupFilter} onChange={e => { setGroupFilter(e.target.value); setPage(1); }}>
-              <option value="">All Groups</option>
-              {['brand','core_service','product_feature','transactional','problem_based','competitor','long_tail','experimental'].map(g => (
-                <option key={g} value={g}>{g.replace('_', ' ')}</option>
-              ))}
-            </select>
-            <select className="h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white" value={labelFilter} onChange={e => { setLabelFilter(e.target.value); setPage(1); }}>
-              <option value="">All Labels</option>
-              {['defend','quick_win','growth_opportunity','competitive','declining','lost','monitor','exclude'].map(l => (
-                <option key={l} value={l}>{l.replace('_', ' ')}</option>
-              ))}
-            </select>
-          </div>
-          <DataTable
-            columns={columns}
-            data={keywords}
-            loading={loading}
-            search
-            searchPlaceholder="Search keywords..."
-            page={page}
-            pageSize={20}
-            total={total}
-            onPageChange={setPage}
-            empty="No keywords found. Sync keywords from AppTweak."
-          />
-        </CardContent>
-      </Card>
+        </>
+      )}
     </div>
   );
 }

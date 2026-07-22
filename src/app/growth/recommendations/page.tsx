@@ -2,210 +2,215 @@
 
 import * as React from 'react';
 import {
-  Lightning, CheckCircle, Eye, ArrowRight, Info
+  Star, MagnifyingGlass, Megaphone, Warning, CheckCircle,
+  ArrowsClockwise, Bug, FileText, ThumbsUp, ThumbsDown, ChartBar, Target, Info
 } from '@phosphor-icons/react';
-import { Card, CardContent, Badge, Button, Modal, Skeleton } from '@/components/ui';
-import { cn, formatDateTime } from '@/lib/utils';
-import { getCategoryLabel } from '@/lib/growth/classification/rules';
+import { Card, CardContent, Badge, Button, Skeleton } from '@/components/ui';
+import { cn } from '@/lib/utils';
 
-const STATUS_STEPS = ['new', 'under_review', 'approved', 'in_progress', 'implemented', 'dismissed'];
-const STATUS_LABELS: Record<string, string> = {
-  new: 'New', under_review: 'Under Review', approved: 'Approved',
-  in_progress: 'In Progress', implemented: 'Implemented', dismissed: 'Dismissed',
-};
-type BadgeVariant = 'default' | 'outline' | 'success' | 'danger' | 'warning' | 'info' | 'purple';
-const STATUS_COLORS: Record<string, BadgeVariant> = {
-  new: 'danger', under_review: 'warning', approved: 'info',
-  in_progress: 'purple', implemented: 'success', dismissed: 'outline',
-};
-const PRIORITY_COLORS: Record<string, BadgeVariant> = {
-  critical: 'danger', high: 'warning', medium: 'info', low: 'outline',
-};
+function PriorityIcon({ priority }: { priority: string }) {
+  const configs: Record<string, { bg: string; label: string }> = {
+    critical: { bg: 'bg-red-100 text-red-700', label: '🚨 CRITICAL' },
+    high: { bg: 'bg-amber-100 text-amber-700', label: '⚠️ HIGH' },
+    medium: { bg: 'bg-blue-50 text-blue-700', label: '💡 MEDIUM' },
+    low: { bg: 'bg-slate-100 text-slate-600', label: 'LOW' },
+    informational: { bg: 'bg-slate-50 text-slate-500', label: 'INFO' },
+  };
+  const c = configs[priority] ?? configs.low;
+  return (
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold', c.bg)}>
+      {c.label}
+    </span>
+  );
+}
+
+function CategoryBadge({ category }: { category: string }) {
+  const configs: Record<string, { bg: string; text: string }> = {
+    rating: { bg: 'bg-amber-50 text-amber-700 border-amber-200', text: 'Rating' },
+    keyword: { bg: 'bg-purple-50 text-purple-700 border-purple-200', text: 'Keyword' },
+    review: { bg: 'bg-blue-50 text-blue-700 border-blue-200', text: 'Review' },
+    metadata: { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', text: 'Metadata' },
+    technical: { bg: 'bg-red-50 text-red-700 border-red-200', text: 'Technical' },
+    campaign: { bg: 'bg-pink-50 text-pink-700 border-pink-200', text: 'Campaign' },
+  };
+  const c = configs[category] ?? { bg: 'bg-slate-50 text-slate-600 border-slate-200', text: category };
+  return (
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border', c.bg)}>
+      {c.text}
+    </span>
+  );
+}
 
 export default function RecommendationsPage() {
   const [apps, setApps] = React.useState<any[]>([]);
-  const [selectedAppId, setSelectedAppId] = React.useState('');
-  const [recommendations, setRecommendations] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [statusFilter, setStatusFilter] = React.useState('');
-  const [priorityFilter, setPriorityFilter] = React.useState('');
-  const [selected, setSelected] = React.useState<any>(null);
-  const [updating, setUpdating] = React.useState(false);
+  const [selectedAppId, setSelectedAppId] = React.useState<string>('');
+  const [data, setData] = React.useState<any>(null);
+  const [loadingApps, setLoadingApps] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
+  const [filter, setFilter] = React.useState<string>('all');
 
   React.useEffect(() => {
-    fetch('/api/growth/apps').then(r => r.json()).then(d => {
-      setApps(d.data ?? []);
-      if (d.data?.[0]?.id) setSelectedAppId(d.data[0].id);
-    }).finally(() => setLoading(false));
+    fetch('/api/auth/me').then(r => r.json()).then(d =>
+      d.authenticated && fetch('/api/growth/apps').then(r => r.json()).then(d => {
+        setApps(d.data ?? []);
+        if (d.data?.[0]?.id) setSelectedAppId(d.data[0].id);
+        setLoadingApps(false);
+      })
+    );
   }, []);
 
-  const fetchRecommendations = React.useCallback(() => {
+  React.useEffect(() => {
     if (!selectedAppId) return;
     setLoading(true);
-    const params = new URLSearchParams({ app_id: selectedAppId });
-    if (statusFilter) params.set('status', statusFilter);
-    if (priorityFilter) params.set('priority', priorityFilter);
-    fetch(`/api/growth/recommendations?${params}`)
+    fetch(`/api/growth/analysis/aso?app_id=${selectedAppId}`)
       .then(r => r.json())
-      .then(d => setRecommendations(d.data ?? []))
+      .then(d => setData(d))
       .finally(() => setLoading(false));
-  }, [selectedAppId, statusFilter, priorityFilter]);
+  }, [selectedAppId]);
 
-  React.useEffect(() => { fetchRecommendations(); }, [fetchRecommendations]);
+  const allRecs = data?.recommendations ?? [];
+  const categories = ['all', 'rating', 'keyword', 'review', 'metadata', 'technical', 'campaign'] as const;
+  const filteredRecs = filter === 'all' ? allRecs : allRecs.filter((r: any) => r.category === filter);
 
-  const updateStatus = async (id: string, status: string) => {
-    setUpdating(true);
-    await fetch(`/api/growth/recommendations/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-    setUpdating(false);
-    fetchRecommendations();
-  };
-
-  const counts = React.useMemo(() => {
-    const c: Record<string, number> = { all: recommendations.length };
-    for (const r of recommendations) c[r.status] = (c[r.status] ?? 0) + 1;
-    return c;
-  }, [recommendations]);
+  const criticalCount = allRecs.filter((r: any) => r.priority === 'critical').length;
+  const highCount = allRecs.filter((r: any) => r.priority === 'high').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Recommendations</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Rule-based ASO improvement suggestions</p>
+          <h1 className="text-2xl font-bold text-slate-900">ASO Recommendations</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Prioritized action items to improve app store performance</p>
         </div>
         <div className="flex items-center gap-3">
-          <select className="h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white" value={selectedAppId} onChange={e => setSelectedAppId(e.target.value)}>
-            <option value="">Select App...</option>
-            {apps.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          <select
+            className="h-10 px-3 rounded-lg border border-slate-200 text-sm bg-white focus:border-brand-500 focus:outline-none"
+            value={selectedAppId}
+            onChange={e => setSelectedAppId(e.target.value)}
+            disabled={loadingApps}
+          >
+            <option value="">Select App…</option>
+            {apps.map(a => <option key={a.id} value={a.id}>{a.name} ({a.platform})</option>)}
           </select>
-          <Button variant="outline" size="sm" leftIcon={<Lightning size={14} />}>Run Engine</Button>
+          <Button variant="outline" size="sm" leftIcon={<ArrowsClockwise size={14} />} onClick={() => {
+            if (!selectedAppId) return;
+            setLoading(true);
+            fetch(`/api/growth/analysis/aso?app_id=${selectedAppId}`).then(r => r.json()).then(setData).finally(() => setLoading(false));
+          }} isLoading={loading}>Refresh</Button>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-        {['all', ...STATUS_STEPS].map(step => (
-          <button
-            key={step}
-            onClick={() => setStatusFilter(step === 'all' ? '' : step)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors',
-              (step === 'all' ? !statusFilter : statusFilter === step)
-                ? 'bg-brand-50 text-brand-700 border border-brand-200'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-            )}
-          >
-            {STATUS_LABELS[step] ?? 'All'}
-            {(counts[step] ?? 0) > 0 && (
-              <span className="bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full text-xs">{counts[step]}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-3 mb-4">
-        <select className="h-9 px-3 rounded-lg border border-slate-200 text-sm bg-white" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
-          <option value="">All Priorities</option>
-          {['critical','high','medium','low','informational'].map(p => (
-            <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-          ))}
-        </select>
-        <Badge variant="outline" size="sm">
-          <Info size={10} className="mr-1" />
-          Rule engine v1.0 — not AI-generated
-        </Badge>
-      </div>
-
-      <div className="space-y-3">
-        {loading ? (
-          [...Array(3)].map((_, i) => <Card key={i}><CardContent className="p-5"><Skeleton variant="rect" height={100} /></CardContent></Card>)
-        ) : recommendations.length === 0 ? (
-          <Card>
-            <CardContent className="py-16 text-center text-slate-400">
-              <Lightning size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No recommendations for this app yet.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          recommendations.map(reco => (
-            <Card key={reco.id} className="hover:border-brand-200 transition-colors">
-              <CardContent className="p-5">
-                <div className="flex items-start gap-4">
-                  <div className={cn(
-                    'w-1.5 rounded-full shrink-0 self-stretch',
-                    reco.priority === 'critical' ? 'bg-red-500' :
-                    reco.priority === 'high' ? 'bg-amber-500' :
-                    reco.priority === 'medium' ? 'bg-blue-500' : 'bg-slate-300'
-                  )} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-900">{reco.title}</h3>
-                        <Badge variant={PRIORITY_COLORS[reco.priority] ?? 'outline'} size="sm">{reco.priority}</Badge>
-                        <Badge variant="outline" size="sm">{getCategoryLabel(reco.category)}</Badge>
-                        <Badge variant={STATUS_COLORS[reco.status] ?? 'outline'} size="sm">{STATUS_LABELS[reco.status]}</Badge>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {reco.status !== 'implemented' && reco.status !== 'dismissed' && (
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            const next = STATUS_STEPS[STATUS_STEPS.indexOf(reco.status) + 1];
-                            if (next) updateStatus(reco.id, next);
-                          }}>
-                            Advance <ArrowRight size={12} />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => setSelected(reco)}><Eye size={14} /></Button>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-600 mb-3">{reco.recommended_action}</p>
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      {reco.expected_directional_impact && <span>Impact: {reco.expected_directional_impact}</span>}
-                      {reco.effort && <span>Effort: {reco.effort}</span>}
-                      <span>{formatDateTime(reco.created_at)}</span>
-                    </div>
-                  </div>
+      {/* Priority Summary */}
+      {allRecs.length > 0 && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[
+            { label: 'Critical', value: criticalCount, icon: <Warning size={16} className="text-red-500" />, bg: 'bg-red-50 border-red-200' },
+            { label: 'High Priority', value: highCount, icon: <ChartBar size={16} className="text-amber-500" />, bg: 'bg-amber-50 border-amber-200' },
+            { label: 'Total Recommendations', value: allRecs.length, icon: <Target size={16} className="text-blue-500" />, bg: 'bg-blue-50 border-blue-200' },
+          ].map(({ label, value, icon, bg }) => (
+            <Card key={label} className={cn('border', bg)}>
+              <CardContent className="p-4 flex items-center gap-3">
+                {icon}
+                <div>
+                  <div className="text-xl font-bold text-slate-900">{value}</div>
+                  <div className="text-xs text-slate-500">{label}</div>
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
+          ))}
+        </div>
+      )}
+
+      {/* Category Filter */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {categories.map(cat => {
+          const count = cat === 'all' ? allRecs.length
+            : allRecs.filter((r: any) => r.category === cat).length;
+          return (
+            <button key={cat} onClick={() => setFilter(cat)}
+              className={cn('px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                filter === cat ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              )}
+            >
+              {cat.charAt(0).toUpperCase() + cat.slice(1)} ({count})
+            </button>
+          );
+        })}
       </div>
 
-      <Modal open={!!selected} onClose={() => setSelected(null)} title="Recommendation Detail" size="lg">
-        {selected && (
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant={PRIORITY_COLORS[selected.priority] ?? 'outline'}>{selected.priority}</Badge>
-              <Badge variant={STATUS_COLORS[selected.status] ?? 'outline'}>{STATUS_LABELS[selected.status]}</Badge>
-              <Badge variant="outline">{getCategoryLabel(selected.category)}</Badge>
-              <Badge variant="outline">{selected.source}</Badge>
-            </div>
-            <h3 className="text-base font-semibold text-slate-900">{selected.title}</h3>
-            <p className="text-sm text-slate-700">{selected.recommended_action}</p>
-            {selected.expected_directional_impact && (
-              <div className="p-3 rounded-lg bg-brand-50 border border-brand-200">
-                <p className="text-xs text-brand-800"><strong>Expected Directional Impact:</strong> {selected.expected_directional_impact}</p>
-              </div>
-            )}
-            {selected.evidence && Object.keys(selected.evidence).length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-slate-500 uppercase mb-2">Evidence</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(selected.evidence).map(([k, v]) => (
-                    <div key={k} className="p-2 rounded bg-slate-50 border border-slate-100">
-                      <p className="text-xs text-slate-500">{k.replace(/_/g, ' ')}</p>
-                      <p className="text-sm font-medium text-slate-900">{String(v)}</p>
+      {/* Recommendations List */}
+      {loading ? (
+        <div className="space-y-4">{[...Array(4)].map((_, i) => <Skeleton key={i} variant="rect" height={120} />)}</div>
+      ) : filteredRecs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <Info size={48} className="text-slate-200 mb-4" />
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">No recommendations yet</h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            {selectedAppId ? 'Run a Full Sync to analyze your app and generate recommendations.' : 'Select an app above to see recommendations.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredRecs.map((rec: any) => (
+            <Card key={rec.id} className={cn(
+              'border-l-4',
+              rec.priority === 'critical' ? 'border-l-red-500' :
+              rec.priority === 'high' ? 'border-l-amber-500' :
+              'border-l-slate-300'
+            )}>
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col gap-1 items-center shrink-0">
+                      <PriorityIcon priority={rec.priority} />
+                      <CategoryBadge category={rec.category} />
                     </div>
-                  ))}
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">{rec.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={cn('text-xs px-1.5 py-0.5 rounded font-mono',
+                          rec.type === 'add' ? 'bg-emerald-50 text-emerald-700' :
+                          rec.type === 'remove' ? 'bg-red-50 text-red-700' :
+                          rec.type === 'fix' ? 'bg-amber-50 text-amber-700' :
+                          rec.type === 'improve' ? 'bg-blue-50 text-blue-700' :
+                          'bg-slate-50 text-slate-600'
+                        )}>
+                          {rec.type}
+                        </span>
+                        <span className="text-xs text-slate-400">Confidence: {Math.round(rec.confidence * 100)}%</span>
+                        <span className="text-xs text-slate-400">Effort: {rec.effort}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div className="p-3 rounded-lg bg-slate-50">
+                    <p className="text-xs font-semibold text-slate-500 mb-1">Finding</p>
+                    <p className="text-xs text-slate-700">{rec.finding}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-brand-50">
+                    <p className="text-xs font-semibold text-brand-600 mb-1">Recommended Action</p>
+                    <p className="text-xs text-brand-800">{rec.action}</p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-emerald-50">
+                    <p className="text-xs font-semibold text-emerald-600 mb-1">Expected Impact</p>
+                    <p className="text-xs text-emerald-800">{rec.expected_impact}</p>
+                  </div>
+                </div>
+
+                {rec.tags?.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {rec.tags.map((tag: string) => (
+                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">#{tag}</span>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -11,22 +11,21 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const appId = searchParams.get('app_id');
     const country = searchParams.get('country') ?? 'id';
-    const language = searchParams.get('language') ?? 'id';
+    const device = searchParams.get('device') ?? 'android';
 
     if (!appId) return NextResponse.json({ error: 'app_id is required' }, { status: 400 });
 
     const { data: app, error: appError } = await supabaseAdmin
       .from('apps').select('*').eq('id', appId).single();
     if (appError || !app) return NextResponse.json({ error: 'App not found' }, { status: 404 });
-    if (!app.store_app_id && !app.package_name) {
-      return NextResponse.json({ error: 'App store ID or package name required' }, { status: 400 });
-    }
+
+    const storeId = app.store_app_id ?? app.package_name;
+    if (!storeId) return NextResponse.json({ error: 'App store ID or package name required' }, { status: 400 });
 
     const client = createApptweakClient();
-    if (!client) return NextResponse.json({ error: 'AppTweak not configured' }, { status: 503 });
+    if (!client) return NextResponse.json({ error: 'AppTweak API key not configured' }, { status: 503 });
 
-    const storeId = app.store_app_id ?? app.package_name!;
-    const metadata = await client.getAppMetadata(app.platform as 'android' | 'ios', storeId, country, language);
+    const metadata = await client.getAppMetadata(storeId, country, device as 'iphone' | 'ipad' | 'android');
 
     // Persist snapshot
     await supabaseAdmin.from('app_metadata_snapshots').insert({
@@ -45,13 +44,13 @@ export async function GET(request: NextRequest) {
       updated_at: metadata.updated_at,
       developer: metadata.developer,
       installs: metadata.installs,
-      current_rating: metadata.current_rating,
-      total_ratings: metadata.total_ratings,
+      current_rating: metadata.ratings?.average,
+      total_ratings: metadata.ratings?.total,
       payload: metadata,
     });
 
     return NextResponse.json({ data: metadata, app_id: appId, fetched_at: new Date().toISOString() });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message ?? 'Unknown error' }, { status: 500 });
   }
 }

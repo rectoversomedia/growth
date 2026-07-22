@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 const PROTECTED_ROUTES = ['/growth', '/api/growth'];
 const AUTH_ROUTES = ['/login'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get('admin_session');
   const isProtected = PROTECTED_ROUTES.some(r => pathname.startsWith(r));

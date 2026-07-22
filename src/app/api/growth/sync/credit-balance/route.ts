@@ -10,18 +10,20 @@ export async function GET(request: NextRequest) {
 
     const client = createApptweakClient();
     if (!client) {
-      return NextResponse.json({ error: 'AppTweak API key not configured', status: 'unavailable' }, { status: 503 });
+      return NextResponse.json({ error: 'AppTweak API key not configured' }, { status: 503 });
     }
 
     const balance = await client.getCredits();
 
     // Log credit check
-    await supabaseAdmin.from('apptweak_credit_log').insert({
-      endpoint_type: 'credit_balance',
-      estimated_cost: 0,
-      actual_cost: 0,
-      remaining_balance: balance.credits,
-    });
+    try {
+      await supabaseAdmin.from('apptweak_credit_log').insert({
+        endpoint_type: 'credit_balance',
+        estimated_cost: 0,
+        actual_cost: 0,
+        remaining_balance: balance.credits,
+      });
+    } catch { /* ignore if table doesn't exist yet */ }
 
     return NextResponse.json({
       credits: balance.credits,
@@ -29,6 +31,6 @@ export async function GET(request: NextRequest) {
       checked_at: new Date().toISOString(),
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? 'Failed to fetch credit balance', status: 'error' }, { status: 502 });
+    return NextResponse.json({ error: err.message ?? 'Failed to fetch credit balance' }, { status: 502 });
   }
 }

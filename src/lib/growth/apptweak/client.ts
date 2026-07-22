@@ -126,14 +126,16 @@ export class ApptweakClient {
 
   /**
    * Check API credit balance.
-   * Endpoint: GET /usage.json
-   * Cost: 1 credit
+   * NOTE: AppTweak has no public credits balance endpoint.
+   * Credits are visible only in the dashboard UI (100,000 for trial).
+   * This method returns a dummy response — credit tracking relies on
+   * the cost shown in each response metadata.cost field.
    */
-  async getCredits(): Promise<{ credits: number; plan: string }> {
-    const data = await this.fetch<any>('/usage.json');
+  async getCredits(): Promise<{ credits: number | null; plan: string; note: string }> {
     return {
-      credits: data.result?.credits ?? 0,
-      plan: data.result?.plan ?? 'unknown',
+      credits: null,
+      plan: 'trial',
+      note: 'Credit balance not available via API — check dashboard.app.apptweak.com',
     };
   }
 

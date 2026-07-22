@@ -418,7 +418,7 @@ CREATE TABLE IF NOT EXISTS growth_settings (
 -- Default sync schedule
 INSERT INTO growth_settings (key, value) VALUES
 ('sync_schedule', '{"metadata":"daily","currentRatings":"daily","ratingHistory":"daily","reviews":"daily","keywordRankings":"daily","keywordMetrics":"weekly","keywordSuggestions":"weekly","competitorData":"daily"}'),
-('credit_threshold_percent', 20),
+('credit_threshold_percent', '20'::jsonb),
 ('aso_score_weights', '{"metadata":0.20,"keywords":0.25,"creative":0.15,"rating":0.20,"review":0.15,"freshness":0.05}')
 ON CONFLICT (key) DO NOTHING;
 

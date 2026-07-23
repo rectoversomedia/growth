@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  ChartBar, Star, ChatCircle, MagnifyingGlass, Sliders,
+  ChartBar, Star, MagnifyingGlass, Sliders,
   Users, Lightning, FileText, Database, Gear,
   SignOut, CaretLeft, TrendUp, GearSix,
   House, StarHalf, ChatCircle, Binoculars, AppWindow,

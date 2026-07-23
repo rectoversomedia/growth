@@ -81,59 +81,29 @@ async function searchGooglePlay(query: string, country: string): Promise<SearchR
 function parseGooglePlayHtml(html: string): SearchResult[] {
   const results: SearchResult[] = [];
 
-  // Match app cards: data-sid="<package_name>"
-  const cardRegex = /data-sid="([^"]+)"/g;
-  const packageNames = [...html.matchAll(cardRegex)].map(m => m[1]).slice(0, 10);
+  // Extract package names from data-sid attributes
+  const packageRegex = /data-sid="([a-zA-Z0-9._]+)"/g;
+  const packageNames = [...html.matchAll(packageRegex)].map(m => m[1]).slice(0, 10);
 
-  // Also try to extract app names and icons from the HTML
-  // Pattern: <span class="沈阳">APP NAME</span> or similar
-  // Icons: data-image-url or src on img tags with thumbnail
+  // Extract app names from title attributes in search result links
+  const nameRegex = /\/store\/apps\/details\?id=[^"]+"><div class=["']?[^"'>]+["']?[^>]*>([^<]+)<\/div>/g;
+  const names = [...html.matchAll(nameRegex)].map(m => m[1].trim()).slice(0, 10);
 
-  // Try extracting from JSON data embedded in the page
-  const jsonMatch = html.match(/AF_initDataCallback\([^)]*data:(.+?)\);<\/script>/s);
-  if (jsonMatch) {
-    try {
-      // Try to find title and icon data
-      const dataStr = jsonMatch[1];
-      const titles = [...dataStr.matchAll(/"title":"([^"]+)"/g)].map(m => m[1]).slice(0, 10);
-      const devs = [...dataStr.matchAll(/"author":"([^"]+)"/g)].map(m => m[1]).slice(0, 10);
-      const icons = [...dataStr.matchAll(/"icon":"([^"]+)"/g)].map(m => m[1]).slice(0, 10);
+  // Extract icons — Google Play uses base64 or thumbnail URLs
+  const iconRegex = /"(https:\/\/play-lh\.googleusercontent\.com\/[^"]+)"[^}]*?"([^"]+)"/g;
+  const icons = [...html.matchAll(iconRegex)].map(m => m[1]).slice(0, 10);
 
-      for (let i = 0; i < Math.min(packageNames.length, 10); i++) {
-        results.push({
-          id: `android_${packageNames[i]}`,
-          name: titles[i] ?? packageNames[i],
-          developer: devs[i] ?? '',
-          icon: icons[i] ?? '',
-          platform: 'android',
-          store_app_id: '',
-          package_name: packageNames[i],
-        });
-      }
-    } catch {
-      // fallback: just use package names
-      for (const pkg of packageNames) {
-        results.push({
-          id: `android_${pkg}`,
-          name: pkg,
-          developer: '',
-          icon: `https://play-lh.googleusercontent.com/${pkg}/s56`,
-          platform: 'android',
-          store_app_id: '',
-          package_name: pkg,
-        });
-      }
-    }
-    return results;
-  }
+  // Extract developers
+  const devRegex = /class=["'][^"]*\b\d+\s+[^""']*['"][^>]*>([^<]{2,50})<\/div>\s*<\/a>\s*<div[^>]*>\s*<div[^>]*>/g;
+  const devs: string[] = [];
 
-  // Fallback: use package names with constructed icon URL
   for (const pkg of packageNames) {
+    const idx = packageNames.indexOf(pkg);
     results.push({
       id: `android_${pkg}`,
-      name: pkg,
-      developer: '',
-      icon: '',
+      name: names[idx] ?? pkg.replace(/\./g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      developer: devs[idx] ?? '',
+      icon: icons[idx] ?? `https://play-lh.googleusercontent.com/${pkg}=s56`,
       platform: 'android',
       store_app_id: '',
       package_name: pkg,

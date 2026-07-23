@@ -113,9 +113,13 @@ async function searchGooglePlay(query: string, country: string): Promise<SearchR
       })
     );
 
-    return detailResults
-      .filter((r): r is PromiseFulfilledResult<SearchResult> => r.status === 'fulfilled')
-      .map(r => r.value);
+    const mapped: SearchResult[] = [];
+    for (const r of detailResults) {
+      if (r.status === 'fulfilled') {
+        mapped.push(r.value as SearchResult);
+      }
+    }
+    return mapped;
 
   } catch {
     return [];

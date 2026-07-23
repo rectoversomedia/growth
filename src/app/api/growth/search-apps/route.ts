@@ -140,25 +140,26 @@ function extractAppName(html: string, fallback: string): string {
 }
 
 function extractDeveloper(html: string): string {
-  // "author" section: <span>DEVELOPER NAME</span>
-  const devMatch = html.match(/<span[^>]*>([A-Z][^<]{2,80})<\/span><\/a><\/div><\/div><\/div><div class="[^"]*l8YSdd/);
-  if (devMatch) return devMatch[1];
-  // Fallback: near FIFGROUP marker
-  const idx = html.indexOf('</a>');
-  if (idx > 0) {
-    const snippet = html.substring(Math.max(0, idx - 200), idx);
-    const nameMatch = snippet.match(/>([A-Za-z0-9\s.&]+)<\/span><\/a>/);
-    if (nameMatch) return nameMatch[1].trim();
+  // Find all spans between itemprop="name" and "Information badges"
+  const namePos = html.indexOf('itemprop="name"');
+  const badgePos = html.indexOf('Information badges');
+  if (namePos >= 0 && badgePos > namePos) {
+    const between = html.substring(namePos, badgePos);
+    const spans = between.match(/<span[^>]*>([A-Za-z0-9][A-Za-z0-9\s.\-/\']{2,60})<\/span>/g) ?? [];
+    for (const span of spans) {
+      const m = span.match(/>([A-Za-z0-9][A-Za-z0-9\s.\-/\']{2,60})</);
+      if (m) return m[1].trim();
+    }
   }
   return '';
 }
 
-function extractIcon(html: string, pkg: string): string {
-  // Find icon from img src attribute — "itemprop=image" or class T75of
-  const iconMatch = html.match(/itemprop="image"\s+src="(https:\/\/play-lh\.googleusercontent\.com[^"]+)"/);
+function extractIcon(html: string, _pkg: string): string {
+  // Find <img src="...play-lh.googleusercontent.com/...">
+  const iconMatch = html.match(/<img\s+src="(https:\/\/play-lh\.googleusercontent\.com\/[^"]+)"/);
   if (iconMatch) {
+    // Replace size params with fixed 256px
     return iconMatch[1].replace(/=w\d+-h\d+.*$/, '=s256');
   }
-  // Fallback
-  return `https://play-lh.googleusercontent.com/${pkg}=s128`;
+  return '';
 }

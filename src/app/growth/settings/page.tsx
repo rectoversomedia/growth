@@ -3,21 +3,37 @@
 import * as React from 'react';
 import {
   AppStoreLogo, Plus, Trash, MagnifyingGlass,
-  CheckCircle, Eye, EyeSlash, Info, ShieldCheck, Users
+  CheckCircle, Eye, EyeSlash, Info, ShieldCheck, Users,
+  MagnifyingGlassPlus, ArrowLeft
 } from '@phosphor-icons/react';
 import { Card, CardContent, Badge, Button, Input, Modal, Skeleton } from '@/components/ui';
 import { cn } from '@/lib/utils';
+
+interface SearchResult {
+  id: string;
+  name: string;
+  developer: string;
+  icon: string;
+  platform: 'ios' | 'android';
+  store_app_id: string;
+  package_name?: string;
+}
 
 export default function SettingsPage() {
   const [apps, setApps] = React.useState<any[]>([]);
   const [user, setUser] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [addOpen, setAddOpen] = React.useState(false);
+  const [addStep, setAddStep] = React.useState<'search' | 'confirm'>('search');
   const [apiKey, setApiKey] = React.useState('');
   const [apiKeyVisible, setApiKeyVisible] = React.useState(false);
   const [validatingKey, setValidatingKey] = React.useState(false);
   const [keyValid, setKeyValid] = React.useState<boolean | null>(null);
   const [search, setSearch] = React.useState('');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [searchResults, setSearchResults] = React.useState<{ ios: SearchResult[]; android: SearchResult[] }>({ ios: [], android: [] });
+  const [searching, setSearching] = React.useState(false);
+  const [selectedApp, setSelectedApp] = React.useState<SearchResult | null>(null);
   const [form, setForm] = React.useState({
     name: '', platform: 'android', store_app_id: '', package_name: '',
     country: 'id', language: 'id',
@@ -25,6 +41,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = React.useState(false);
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin';
+  const searchDebounce = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     Promise.all([
@@ -35,6 +52,52 @@ export default function SettingsPage() {
       setApps(appsData.data ?? []);
     }).finally(() => setLoading(false));
   }, []);
+
+  React.useEffect(() => {
+    if (!isSuperAdmin) return;
+    if (searchDebounce.current) clearTimeout(searchDebounce.current);
+    if (searchQuery.length < 2) { setSearchResults({ ios: [], android: [] }); return; }
+    setSearching(true);
+    searchDebounce.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/growth/search-apps?q=${encodeURIComponent(searchQuery)}&country=id`);
+        const data = await res.json();
+        setSearchResults(data.results ?? { ios: [], android: [] });
+      } catch {
+        setSearchResults({ ios: [], android: [] });
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => { if (searchDebounce.current) clearTimeout(searchDebounce.current); };
+  }, [searchQuery, isSuperAdmin]);
+
+  const openAddModal = () => {
+    setAddStep('search');
+    setAddOpen(true);
+    setSearchQuery('');
+    setSearchResults({ ios: [], android: [] });
+    setSelectedApp(null);
+    setForm({ name: '', platform: 'android', store_app_id: '', package_name: '', country: 'id', language: 'id' });
+  };
+
+  const selectApp = (app: SearchResult) => {
+    setSelectedApp(app);
+    setForm({
+      name: app.name,
+      platform: app.platform,
+      store_app_id: app.store_app_id,
+      package_name: app.package_name ?? '',
+      country: 'id',
+      language: 'id',
+    });
+    setAddStep('confirm');
+  };
+
+  const backToSearch = () => {
+    setAddStep('search');
+    setSelectedApp(null);
+  };
 
   const validateApiKey = async () => {
     if (!apiKey) return;
@@ -62,7 +125,8 @@ export default function SettingsPage() {
     setApps(r.data ?? []);
     setSaving(false);
     setAddOpen(false);
-    setForm({ name: '', platform: 'android', store_app_id: '', package_name: '', country: 'id', language: 'id' });
+    setAddStep('search');
+    setSelectedApp(null);
   };
 
   const deleteApp = async (id: string) => {
@@ -77,6 +141,11 @@ export default function SettingsPage() {
     app.store_app_id?.toLowerCase().includes(search.toLowerCase()) ||
     app.package_name?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const allResults = [...searchResults.ios, ...searchResults.android];
+  const alreadyAdded = new Set(apps.map(a => a.platform === 'ios' ? a.store_app_id : a.package_name));
+  const canAdd = (app: SearchResult) =>
+    app.platform === 'ios' ? !alreadyAdded.has(app.store_app_id) : !alreadyAdded.has(app.package_name ?? '');
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -148,7 +217,7 @@ export default function SettingsPage() {
                   : 'Apps being monitored for ASO intelligence'}
               </p>
             </div>
-            <Button variant="default" size="sm" leftIcon={<Plus size={14} />} onClick={() => setAddOpen(true)}>
+            <Button variant="default" size="sm" leftIcon={<Plus size={14} />} onClick={openAddModal}>
               Add App
             </Button>
           </div>
@@ -223,59 +292,161 @@ export default function SettingsPage() {
       </Card>
 
       {/* Add App Modal */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add App" size="md">
-        <div className="space-y-4">
-          <Input
-            label="App Name"
-            placeholder="FIFGO"
-            value={form.name}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Platform</label>
-              <select
-                className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm focus:outline-none focus:border-brand-500"
-                value={form.platform}
-                onChange={e => setForm(f => ({ ...f, platform: e.target.value }))}
-              >
-                <option value="android">Android</option>
-                <option value="ios">iOS</option>
-              </select>
+      <Modal
+        open={addOpen}
+        onClose={() => { setAddOpen(false); setAddStep('search'); setSelectedApp(null); }}
+        title={addStep === 'search' ? 'Add App — Search Store' : 'Confirm App'}
+        size="lg"
+      >
+        {addStep === 'search' ? (
+          <div className="space-y-3">
+            {/* Search input */}
+            <div className="relative">
+              <MagnifyingGlassPlus size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search apps by name, e.g. fifgo, tiktok, shopee..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full h-11 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:bg-white transition-all"
+              />
             </div>
-            <Input
-              label="Country Code"
-              placeholder="id"
-              value={form.country}
-              onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-            />
+
+            {searching && (
+              <div className="py-6 text-center text-slate-400">
+                <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs">Searching App Store & Google Play...</p>
+              </div>
+            )}
+
+            {!searching && searchQuery.length >= 2 && allResults.length === 0 && (
+              <div className="py-6 text-center text-slate-400">
+                <MagnifyingGlass size={20} className="mx-auto mb-1.5 opacity-50" />
+                <p className="text-sm">No results for "{searchQuery}"</p>
+                <p className="text-xs mt-1">Try a different keyword</p>
+              </div>
+            )}
+
+            {!searching && searchQuery.length < 2 && (
+              <div className="py-6 text-center text-slate-400">
+                <AppStoreLogo size={28} className="mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Start typing to search apps</p>
+                <p className="text-xs mt-1">Searches both iOS App Store & Google Play</p>
+              </div>
+            )}
+
+            {/* Results */}
+            {allResults.length > 0 && (
+              <div className="space-y-1 max-h-[380px] overflow-y-auto pr-1">
+                {allResults.map(app => {
+                  const canAddThis = canAdd(app);
+                  return (
+                    <button
+                      key={app.id}
+                      disabled={!canAddThis}
+                      onClick={() => canAddThis && selectApp(app)}
+                      className={cn(
+                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all',
+                        canAddThis
+                          ? 'border-slate-200 hover:border-brand-400 hover:bg-brand-50/50 cursor-pointer'
+                          : 'border-slate-100 bg-slate-50 opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      {app.icon ? (
+                        <img src={app.icon} alt={app.name} className="w-10 h-10 rounded-xl object-cover shrink-0 bg-slate-100" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                          <AppStoreLogo size={18} className="text-brand-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-900 truncate">{app.name}</span>
+                          <Badge variant={app.platform === 'ios' ? 'purple' : 'info'} size="sm">
+                            {app.platform === 'ios' ? 'iOS' : 'Android'}
+                          </Badge>
+                          {!canAddThis && (
+                            <span className="text-[10px] text-slate-400 font-medium">Already added</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 truncate mt-0.5">{app.developer}</p>
+                      </div>
+                      {canAddThis && (
+                        <Plus size={15} className="text-brand-500 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Manual entry for non-super-admin */}
+            {!isSuperAdmin && (
+              <div className="pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => setAddStep('confirm')}
+                  className="w-full text-center text-xs text-slate-400 hover:text-brand-600 transition-colors"
+                >
+                  Can't find it? Enter app details manually →
+                </button>
+              </div>
+            )}
           </div>
-          {form.platform === 'android' ? (
-            <Input
-              label="Package Name"
-              placeholder="com.fifgo.app"
-              value={form.package_name}
-              onChange={e => setForm(f => ({ ...f, package_name: e.target.value }))}
-            />
-          ) : (
-            <Input
-              label="Apple App ID"
-              placeholder="1234567890"
-              value={form.store_app_id}
-              onChange={e => setForm(f => ({ ...f, store_app_id: e.target.value }))}
-            />
-          )}
-          <Input
-            label="Language Code"
-            placeholder="id"
-            value={form.language}
-            onChange={e => setForm(f => ({ ...f, language: e.target.value }))}
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={saveApp} isLoading={saving}>Save App</Button>
+        ) : (
+          <div className="space-y-4">
+            {/* App preview */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              {selectedApp?.icon ? (
+                <img src={selectedApp.icon} alt={selectedApp.name} className="w-12 h-12 rounded-xl object-cover bg-slate-200 shrink-0" />
+              ) : (
+                <div className="w-12 h-12 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+                  <AppStoreLogo size={20} className="text-brand-600" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-slate-900">{form.name}</p>
+                  <Badge variant={form.platform === 'ios' ? 'purple' : 'info'} size="sm">
+                    {form.platform === 'ios' ? 'iOS' : 'Android'}
+                  </Badge>
+                </div>
+                {selectedApp && <p className="text-xs text-slate-400 mt-0.5">{selectedApp.developer}</p>}
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <Input label="App Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Platform</label>
+                <select
+                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm focus:outline-none focus:border-brand-500"
+                  value={form.platform}
+                  onChange={e => setForm(f => ({ ...f, platform: e.target.value }))}
+                >
+                  <option value="android">Android</option>
+                  <option value="ios">iOS</option>
+                </select>
+              </div>
+              <Input label="Country" placeholder="id" value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
+            </div>
+            {form.platform === 'android' ? (
+              <Input label="Package Name" placeholder="com.fifgo.app" value={form.package_name} onChange={e => setForm(f => ({ ...f, package_name: e.target.value }))} />
+            ) : (
+              <Input label="Apple App ID" placeholder="1234567890" value={form.store_app_id} onChange={e => setForm(f => ({ ...f, store_app_id: e.target.value }))} />
+            )}
+            <Input label="Language" placeholder="id" value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value }))} />
+
+            <div className="flex justify-between pt-2">
+              <Button variant="ghost" size="sm" leftIcon={<ArrowLeft size={13} />} onClick={backToSearch}>Back</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setAddOpen(false); setAddStep('search'); }}>Cancel</Button>
+                <Button onClick={saveApp} isLoading={saving}>Save App</Button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </Modal>
     </div>
   );

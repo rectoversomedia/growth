@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [keyValid, setKeyValid] = React.useState<boolean | null>(null);
   const [search, setSearch] = React.useState('');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [platformFilter, setPlatformFilter] = React.useState<'all' | 'ios' | 'android'>('all');
   const [searchResults, setSearchResults] = React.useState<{ ios: SearchResult[]; android: SearchResult[] }>({ ios: [], android: [] });
   const [searching, setSearching] = React.useState(false);
   const [selectedApp, setSelectedApp] = React.useState<SearchResult | null>(null);
@@ -142,7 +143,15 @@ export default function SettingsPage() {
     app.package_name?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const allResults = [...searchResults.ios, ...searchResults.android];
+  const allResults = [
+    ...(platformFilter === 'all' || platformFilter === 'android' ? searchResults.android : []),
+    ...(platformFilter === 'all' || platformFilter === 'ios' ? searchResults.ios : []),
+  ];
+  const platformCounts = {
+    all: searchResults.ios.length + searchResults.android.length,
+    ios: searchResults.ios.length,
+    android: searchResults.android.length,
+  };
   const alreadyAdded = new Set(apps.map(a => a.platform === 'ios' ? a.store_app_id : a.package_name));
   const canAdd = (app: SearchResult) =>
     app.platform === 'ios' ? !alreadyAdded.has(app.store_app_id) : !alreadyAdded.has(app.package_name ?? '');
@@ -313,6 +322,38 @@ export default function SettingsPage() {
               />
             </div>
 
+            {/* Platform Filter Tabs */}
+            {searchQuery.length >= 2 && (
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 w-fit">
+                {([
+                  { key: 'all', label: 'All Stores', icon: null },
+                  { key: 'android', label: 'Google Play', icon: null },
+                  { key: 'ios', label: 'App Store', icon: null },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setPlatformFilter(key)}
+                    className={cn(
+                      'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all',
+                      platformFilter === key
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    )}
+                  >
+                    {label}
+                    {platformCounts[key] > 0 && (
+                      <span className={cn(
+                        'ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                        platformFilter === key ? 'bg-brand-100 text-brand-600' : 'bg-slate-200 text-slate-500'
+                      )}>
+                        {platformCounts[key]}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {searching && (
               <div className="py-6 text-center text-slate-400">
                 <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -332,7 +373,7 @@ export default function SettingsPage() {
               <div className="py-6 text-center text-slate-400">
                 <AppStoreLogo size={28} className="mx-auto mb-2 opacity-40" />
                 <p className="text-sm">Start typing to search apps</p>
-                <p className="text-xs mt-1">Searches both iOS App Store & Google Play</p>
+                <p className="text-xs mt-1">Search iOS App Store & Google Play</p>
               </div>
             )}
 

@@ -5,7 +5,7 @@ import {
   TrendUp, TrendDown, Star, FileText, Download, Eye,
   ChartLineUp, ShieldCheck, ChatCircle, Megaphone,
   ArrowsClockwise, CheckCircle, Warning, MagnifyingGlass,
-  Palette, TextAa, Image as ImageIcon, BarChart,
+  Palette, TextAa, Image as ImageIcon, ChartBar,
   CaretRight, Info, Sparkle, ArrowUp, ArrowDown, Minus,
   ClipboardText, CloudArrowUp, Globe, Trophy
 } from '@phosphor-icons/react';
@@ -296,7 +296,7 @@ export default function ReportsPage() {
             {/* ── Tabs ── */}
             <div className="flex items-end gap-1 mb-0 overflow-x-auto">
               {[
-                { key: 'overview', label: 'Overview', icon: BarChart },
+                { key: 'overview', label: 'Overview', icon: ChartBar },
                 { key: 'texts', label: 'App Texts', icon: TextAa },
                 { key: 'visuals', label: 'Visuals', icon: ImageIcon },
                 { key: 'reviews', label: 'Reviews', icon: ChatCircle },
